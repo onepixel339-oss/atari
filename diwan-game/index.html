@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الديوان</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f2e4c8'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%23a3332e'/%3E%3Ctext x='32' y='41' font-size='24' text-anchor='middle' fill='%23f2e4c8' font-family='serif'%3E%D8%AF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Mute Button -->
+<button class="mute-btn" id="muteBtn" onclick="toggleMute()" aria-label="كتم الصوت">🔊</button>
+
+<!-- Hidden file input for photo upload -->
+<input type="file" id="photoInput" accept="image/*" style="display:none">
+
+<!-- ==================== SCREEN 1: ENTRY ==================== -->
+<div class="screen active world" id="screenEntry">
+  <div class="entry-paper paper-texture" id="entryPaper" style="position:relative;">
+    <div class="form-glow" id="formGlow"></div>
+    <div class="entry-title">الديوان</div>
+    <div class="entry-subtitle">اختبر معلوماتك في ديوان الحكمة</div>
+
+    <div class="photo-slot" id="photoSlot" onclick="document.getElementById('photoInput').click()">
+      <span class="placeholder" id="photoPlaceholder">●</span>
+    </div>
+
+    <div class="name-input-wrap">
+      <input type="text" class="name-input" id="nameInput" placeholder="اسمك هنا..." maxlength="20" autocomplete="off">
+    </div>
+
+    <div class="avatar-grid" id="avatarGrid"></div>
+
+    <div class="sig-wrap">
+      <div class="sig-label">
+        <span>توقيعك (اختياري)</span>
+        <button class="sig-clear-btn" id="sigClearBtn" onclick="clearSignature()">امسح</button>
+      </div>
+      <canvas class="sig-canvas" id="sigCanvas" width="560" height="200"></canvas>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" disabled onclick="startGame()">ادخل الديوان</button>
+
+    <button class="hall-toggle-btn" id="hallToggleBtn" onclick="toggleHall()" aria-label="فتح لوحة الشرف">🏆 لوحة الشرف</button>
+
+    <div class="hall-panel" id="hallPanel" style="display:none;">
+      <div class="hall-title">🏆 لوحة الشرف</div>
+      <div class="hall-sub">أشطر موظفين الديوان — أعلى النقط</div>
+      <div class="hall-rows" id="hallRows"></div>
+      <div class="hall-foot">نتيجتك بتتسجل في اللوحة أول ما توصل لشهادة التقدير</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ==================== SCREEN: DESK HUB (Prompt 1) ==================== -->
+<div class="screen" id="screenDesk">
+  <div class="desk-surface">
+    <div class="desk-title">المكتب</div>
+    <div class="desk-subtitle" id="deskSubtitle">اختر ملف للبدء</div>
+    <div class="dossier-stack" id="dossierStack">
+    </div>
+  </div>
+  <!-- ========== مشهد الديوان المرسوم — لوحة كاملة والعناصر الحية مقصوصة من اللوحة نفسها ========== -->
+  <div class="desk-scene" aria-hidden="true">
+    <div class="scene-canvas" id="sceneCanvas">
+
+      <!-- مروحة السقف المتحركة (اللوحة متولدة من غير مروحة عن قصد عشان دي تركب فوقيها) -->
+      <!-- الظل = نسخة مسطحة من نفس ريش المروحة (نفس viewBox ونفس المسارات) عشان الدوران يبان مرتبط بيها -->
+      <div class="fan-shadow" aria-hidden="true">
+        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
+          <g class="fan-shadow-blades">
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(120 120 45)"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(240 120 45)"/>
+            <circle cx="120" cy="45" r="14"/>
+          </g>
+        </svg>
+      </div>
+      <div class="scene-fan">
+        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="fanRodG" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#6B5836"/>
+              <stop offset=".5" stop-color="#9C8455"/>
+              <stop offset="1" stop-color="#544324"/>
+            </linearGradient>
+            <radialGradient id="fanHubG" cx=".38" cy=".3" r=".95">
+              <stop offset="0" stop-color="#C4A76E"/>
+              <stop offset="1" stop-color="#5A4728"/>
+            </radialGradient>
+            <linearGradient id="bladeG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#7A6540"/>
+              <stop offset=".55" stop-color="#5E4C2C"/>
+              <stop offset="1" stop-color="#463822"/>
+            </linearGradient>
+          </defs>
+          <rect x="100" y="0" width="40" height="10" rx="4" fill="#3A2E1C"/>
+          <rect x="113" y="8" width="14" height="26" rx="6" fill="url(#fanRodG)"/>
+          <ellipse cx="120" cy="47" rx="32" ry="17" fill="#5A4A2E"/>
+          <ellipse cx="120" cy="43" rx="32" ry="14" fill="#6E5A38"/>
+          <ellipse cx="120" cy="41" rx="26" ry="9" fill="#7E6A44"/>
+          <g class="fan-blades">
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(120 120 45)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(120 120 45)"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(240 120 45)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(240 120 45)"/>
+          </g>
+          <circle cx="120" cy="45" r="12" fill="url(#fanHubG)"/>
+          <circle cx="120" cy="45" r="4.5" fill="#3A2E1C"/>
+        </svg>
+      </div>
+
+      <!-- توهج دافي من لمبات النحاس -->
+      <span class="lamp-glow glow-1"></span>
+      <span class="lamp-glow glow-2"></span>
+
+      <!-- ساعة الحيطة — عقاربها بتتحرك ببالوقت الحقيقي -->
+      <div class="scene-clock">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="49" fill="#3E3020"/>
+          <circle cx="50" cy="50" r="45" fill="#5C4A2C"/>
+          <circle cx="50" cy="50" r="41" fill="#F5EFDD"/>
+          <g stroke="#4A3A22" stroke-width="2.4" stroke-linecap="round">
+            <line x1="50" y1="12" x2="50" y2="17.5"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(30 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(60 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(90 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(120 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(150 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(180 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(210 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(240 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(270 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(300 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(330 50 50)"/>
+          </g>
+          <line class="hand hand-h" x1="50" y1="52" x2="50" y2="29" stroke="#33270F" stroke-width="4.6" stroke-linecap="round"/>
+          <line class="hand hand-m" x1="50" y1="52" x2="50" y2="18" stroke="#33270F" stroke-width="3.2" stroke-linecap="round"/>
+          <line class="hand hand-s" x1="50" y1="56" x2="50" y2="14.5" stroke="#A6362A" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="3.4" fill="#33270F"/>
+          <circle cx="50" cy="50" r="1.5" fill="#A6362A"/>
+        </svg>
+      </div>
+
+      <!-- ذرات غبار عايمة في ضوء اللمبات -->
+      <span class="motes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+
+      <!-- القصاصات التفاعلية: كلها أبناء الكانفاس مباشرة عشان نسبها تطابق الرسم في كل المقاسات -->
+      <button class="prop-sprite sp-phone" tabindex="-1" onclick="window.DeskProps&&DeskProps.ring(event)" title="هاتف المصالح — دوس واسمع الرن" aria-label="هاتف المصالح"></button>
+      <button class="prop-sprite sp-tea" tabindex="-1" onclick="window.DeskProps&&DeskProps.stir(event)" title="شاي؟ دوس وجرب" aria-label="استكان شاي">
+        <span class="tea-steam"><i></i><i></i><i></i><i></i></span>
+      </button>
+      <button class="prop-sprite sp-nuts" tabindex="-1" onclick="window.DeskProps&&DeskProps.crack(event)" title="سوداني! دوس اكشش" aria-label="طبق سوداني"></button>
+      <button class="prop-sprite sp-stamp" tabindex="-1" onclick="window.DeskProps&&DeskProps.hit(event)" title="ادوس بالختم" aria-label="ختم ونهاسة"></button>
+      <button class="prop-sprite sp-papers" tabindex="-1" onclick="window.DeskProps&&DeskProps.flutter(event)" title="ورق رسمي مربوط" aria-label="أوراق رسمية"></button>
+
+      <!-- طبقة تعتيم: لمبة الكهرباء بتنقط أحيانًا زي فكة الوزارات -->
+      <div class="scene-dim" id="sceneDim"></div>
+    </div>
+  </div>
+
+  <div class="desk-bg-overlay" id="deskBgOverlay"></div>
+</div>
+
+<!-- ==================== SCREEN 2: GAMEPLAY ==================== -->
+<div class="screen world" id="screenGame">
+  <div class="game-container">
+    <button class="desk-back-btn" onclick="exitDocToDesk()">◄ المكتب</button>
+    <!-- Top bar -->
+    <div class="top-bar">
+      <div class="streak-box">
+        <span class="streak-fire">★</span>
+        <span id="streakNum">0</span>
+      </div>
+      <div class="powerups">
+        <button class="powerup-btn fifty-futta" id="btnFifty" onclick="useFiftyFifty()" aria-label="فطة تمسح إجابتين غلط" title="فطة! نمسحلك إجابتين غلط">🧽 فطة</button>
+        <button class="powerup-btn wasta" id="btnWasta" onclick="useWasta()" aria-label="واسطة تخطي السؤال" title="واسطة! تعدي السؤال ده من غير غلطة">🤝 واسطة</button>
+        <button class="powerup-btn tea" id="btnBribe" onclick="useBribe()" aria-label="شاي مع الممتحن يكسب تلميح" title="تتشاي مع الممتحن بـ 15 نقطة ويسرّبلك تلميح">☕ شاي</button>
+      </div>
+    </div>
+
+    <!-- Time bar — الشمعة والكومة اتشالوا (كانوا واخدين مساحة ببلاش) والشريط الملوّن بيؤدي نفس الوظيفة -->
+    <div class="candle-wrap">
+      <div class="candle-time" id="candleTime">15</div>
+    </div>
+
+    <!-- Question card -->
+    <div class="question-card paper-texture" id="questionCard">
+      <div id="catBadge" class="cat-badge"></div>
+      <div class="question-text" id="questionText"></div>
+      <div class="options-grid" id="optionsGrid" role="group" aria-label="خيارات الإجابة"></div>
+      <div class="order-grid" id="orderGrid" style="display:none;"></div>
+      <button class="order-submit-btn" id="orderSubmitBtn" onclick="submitOrderAnswer()" style="display:none;">رتّب وأرسل</button>
+      <div class="text-answer-wrap" id="textAnswerWrap" style="display:none;">
+        <input type="text" class="text-answer-input" id="textAnswerInput" placeholder="اكتب إجابتك..." autocomplete="off" onkeydown="if(event.key==='Enter')submitTextAnswer()">
+        <button class="text-submit-btn" onclick="submitTextAnswer()">أرسل</button>
+      </div>
+      <button class="appeal-btn" id="appealBtn" onclick="useAppeal()" style="display:none;">تطلب استئناف؟ (+10 ثواني، رسوم 30%)</button>
+      <div class="hint-note" id="hintNote" style="display:none;"></div>
+      <div class="margin-note" id="marginNote" style="display:none;"></div>
+      <div class="stamp-overlay" id="stampOverlay"></div>
+      <!-- Bribe confirmation overlay -->
+      <div class="bribe-confirm" id="bribeConfirm">
+        <div class="bribe-confirm-text">تدفع 15 نقطة تتشاي مع الممتحن ويسرّبلك تلميح؟ ☕</div>
+        <div class="bribe-confirm-btns">
+          <button class="bribe-confirm-btn bribe-confirm-yes" onclick="confirmBribe()">اتفضل يا فندم</button>
+          <button class="bribe-confirm-btn bribe-confirm-no" onclick="cancelBribe()">لأ، سيبني</button>
+        </div>
+      </div>
+      <!-- Second Witness overlay -->
+      <div class="witness-card" id="witnessCard">
+        <div class="witness-title">متأكد؟<br>عندك ٥ ثواني تغيّر رأيك أو تثبته</div>
+        <div class="witness-timer-wrap">
+          <div class="witness-timer-bar"><div class="witness-timer-fill" id="witnessTimerFill"></div></div>
+          <span class="witness-timer-num" id="witnessTimerNum">5</span>
+        </div>
+        <div class="witness-btns">
+          <button class="witness-btn witness-btn-confirm" onclick="confirmWitness()">أثبت إجابتي</button>
+          <button class="witness-btn witness-btn-change" onclick="changeWitness()">أغيّرها</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 3: BONUS ==================== -->
+<div class="screen world" id="screenBonus">
+  <!-- Bonus Intro -->
+  <div id="bonusIntro" class="bonus-intro bonus-intro-bg paper-texture">
+    <div class="secret-stamp">سرّي</div>
+    <div class="bonus-title">▲ جاهز للمخاطرة؟</div>
+    <div class="bonus-rules">
+      🎯 تحدي العباقرة — 7 أسئلة مركبة · دقيقة ونصف لكل سؤال<br>
+      إجابة صح: <strong style="color:#6BCB77;">+20</strong> نقطة · إجابة غلط: <strong style="color:#FF6B6B;">-12</strong> نقطة — خمّن من غير ما تعرف وانت خسران!
+    </div>
+    <div class="bonus-btns">
+      <button class="bonus-btn bonus-btn-risk" onclick="startBonusPlay()">يلا مخاطرة</button>
+      <button class="bonus-btn bonus-btn-skip" onclick="skipBonus()">لأ خلصت</button>
+    </div>
+  </div>
+
+  <!-- Bonus Play -->
+  <div id="bonusPlay" style="display:none; width:100%; max-width:460px; padding:0 16px;">
+    <div class="bonus-hud">
+      <div class="bonus-score-indicator" id="bonusScoreInd">0</div>
+      <div class="candle-time" id="bonusTime">1:30</div>
+    </div>
+    <div class="progress-stamps" id="bonusStamps"></div>
+    <div class="question-card paper-texture" id="bonusCard" style="position:relative; overflow:hidden;">
+      <div class="question-text" id="bonusQText"></div>
+      <div class="options-grid" id="bonusOpts"></div>
+      <div class="stamp-overlay" id="bonusStamp"></div>
+    </div>
+  </div>
+
+  <!-- Bonus End -->
+  <div id="bonusEnd" style="display:none;">
+    <div class="bonus-end paper-texture" style="border-radius:12px; padding:32px 24px; max-width:420px; width:100%;">
+      <div style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:8px;">نتيجة المخاطرة</div>
+      <div style="font-family:var(--font-display); font-size:2.5rem; margin-bottom:4px;" id="bonusFinalScore">0</div>
+      <div id="bonusFinalStampWrap"></div>
+      <div class="bonus-btns" style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+        <button class="bonus-btn bonus-btn-risk" onclick="openGeniusExplanations()">📖 الاجابات التفصيلية</button>
+        <button class="bonus-btn bonus-btn-skip" onclick="goToCertificate()">شوف الشهادة</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SCREEN 4: CERTIFICATE ==================== -->
+<div class="screen world" id="screenCert">
+  <div class="certificate-container" id="certContainer">
+    <div class="certificate paper-texture" id="certPaper">
+      <div class="cert-edge-top"></div>
+      <div class="cert-edge-bottom"></div>
+      <div class="cert-edge-left"></div>
+      <div class="cert-edge-right"></div>
+      <div class="cert-inner">
+        <!-- شبكة الزخرفة التقاطعية اتشالت نهائيًا — كانت بتظهر كشبكة في الصورة المحملة والمستخدم مش عايزها -->
+        <!-- Right column: Photo + Signature (appears on right in RTL) -->
+        <div class="cert-left-col">
+          <div class="cert-photo-slot" id="certPhotoSlot" onclick="document.getElementById('certPhotoInput').click()">
+            <span id="certPhotoPlaceholder">●</span>
+            <input type="file" id="certPhotoInput" accept="image/*" style="display:none">
+          </div>
+          <img class="cert-sig" id="certSig" style="display:none" alt="">
+          <div class="cert-damgha" id="certDamgha"></div>
+        </div>
+        <!-- Left column: All text content (appears on left in RTL) -->
+        <div class="cert-right-col">
+          <div class="cert-eyebrow">شهادة تقدير — الديوان</div>
+          <div class="cert-title">نتائج التحدي النهائي</div>
+          <div class="cert-name" id="certName"></div>
+          <div class="cert-score-block">
+            <div class="cert-score-num" id="certScoreNum">0</div>
+            <div class="cert-score-label">نقطة</div>
+            <div class="cert-percent" id="certPercent"></div>
+          </div>
+          <div class="cert-phrase" id="certPhrase"></div>
+          <div class="cert-stamp" id="certStamp"></div>
+          <div class="badges-row" id="badgesRow"></div>
+          <!-- المرفقات (Prompt 5) -->
+          <div class="enclosures-section" id="enclosuresSection" style="display:none">
+            <div class="enclosures-title">المرفقات</div>
+            <div class="enclosures-row" id="enclosuresRow"></div>
+          </div>
+          <!-- رقم مرجعي رسمي (Prompt 6) -->
+          <div class="cert-ref-number" id="certRefNumber"></div>
+          <!-- سطر لوحة الشرف -->
+          <div class="cert-hall-line" id="certHallLine"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cert-btns">
+      <button class="cert-btn cert-btn-share" onclick="shareCert()">▶ شارك</button>
+      <button class="cert-btn cert-btn-download" onclick="downloadCert()">◀ حمّل</button>
+      <button class="cert-btn cert-btn-back" onclick="returnToDeskFromCert()">↩ الرجوع للمكتب</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Achievement Card Overlay (Prompt 4) -->
+<div class="achieve-overlay" id="achieveOverlay">
+  <div class="achieve-card" id="achieveCard">
+    <div class="achieve-stamp" id="achieveStamp"></div>
+    <div class="card-content" id="achieveContent">
+      <div class="achieve-doc-name" id="achieveDocName"></div>
+      <div class="achieve-score-line" id="achieveScoreLine"></div>
+      <div class="achieve-date" id="achieveDate"></div>
+      <div class="achieve-ref" id="achieveRef"></div>
+      <div class="achieve-btns">
+        <button class="achieve-back-btn achieve-explain-btn" onclick="openAchieveExplanations()">📖 الاجابات التفصيلية</button>
+        <button class="achieve-back-btn" onclick="closeAchievementCard()">رجوع للمكتب</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Envelope Overlay (Prompt 5) -->
+<div class="envelope-wrap" id="envelopeWrap">
+  <div class="envelope" id="envelope" onclick="openEnvelope()">
+    <div class="envelope-flap"></div>
+    <div class="envelope-body"></div>
+    <div class="envelope-seal">ديوان</div>
+    <div class="envelope-label">المظروف الختامي</div>
+  </div>
+</div>
+
+<!-- Card Review Overlay (Prompt 5 - enclosure preview) -->
+<div class="card-review-overlay" id="cardReviewOverlay" onclick="if(event.target===this)closeCardReview()">
+  <button class="card-review-close" onclick="closeCardReview()" aria-label="إغلاق المعاينة">✕</button>
+  <div id="cardReviewContent"></div>
+</div>
+
+<!-- الاجابات التفصيلية — بتظهر آخر كل ملف/قسم بعد ما يخلص -->
+<div class="explain-overlay" id="explainOverlay">
+  <div class="explain-card paper-texture">
+    <div class="explain-head">
+      <div class="explain-title" id="explainTitle">📖 الاجابات التفصيلية</div>
+      <div class="explain-sub" id="explainSub"></div>
+    </div>
+    <div class="explain-list" id="explainList"></div>
+    <button class="explain-close-btn" id="explainCloseBtn" onclick="closeExplainReview()">يلا نكمّل ←</button>
+  </div>
+</div>
+
+<script src="data/questions.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ambience.js"></script>
+</body>
+</html>
