@@ -4,941 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>الديوان</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f2e4c8'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%23a3332e'/%3E%3Ctext x='32' y='41' font-size='24' text-anchor='middle' fill='%23f2e4c8' font-family='serif'%3E%D8%AF%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<style>
-:root {
-  --diwan-paper: #EBE0C6;
-  --diwan-paper-soft: #F3EBD8;
-  --diwan-desk: #B99B6B;
-  --diwan-desk-dark: #93773F;
-  --diwan-kraft: #C6A876;
-  --diwan-kraft-dark: #8A6B3E;
-  --diwan-ink: #26344A;
-  --diwan-ink-soft: #4A5C78;
-  --diwan-burnt: #8B4A38;
-  --diwan-success: #2E6E45;
-  --diwan-error: #A6362A;
-  --diwan-amber: #C69A44;
-  --font-display: 'Aref Ruqaa', serif;
-  --font-body: 'Cairo', sans-serif;
-  --ease-diwan: cubic-bezier(.34,1.56,.64,1);
-  --ease-press: cubic-bezier(.4,0,.2,1);
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: var(--font-body);
-  background: var(--diwan-desk);
-  color: var(--diwan-ink);
-  min-height: 100vh;
-  overflow-x: hidden;
-  position: relative;
-}
-
-/* Wood texture noise overlay */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  opacity: 0.15;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-}
-
-/* Paper texture */
-.paper-texture {
-  background: var(--diwan-paper);
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
-  background-size: 256px 256px;
-  border: 2px solid var(--diwan-kraft);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15), inset 0 0 30px rgba(0,0,0,0.04);
-}
-
-/* ========== SCREEN SYSTEM ========== */
-.screen {
-  display: none;
-  position: relative;
-  z-index: 1;
-  min-height: 100vh;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.screen.active {
-  display: flex;
-  animation: screenIn 0.5s var(--ease-diwan) forwards;
-}
-.screen.fade-out {
-  animation: screenOut 0.35s ease-in forwards;
-}
-
-@keyframes screenIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes screenOut {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-15px); }
-}
-
-/* ========== MUTE BUTTON ========== */
-.mute-btn {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 1000;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid var(--diwan-kraft);
-  background: var(--diwan-paper);
-  color: var(--diwan-ink);
-  font-size: 20px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  transition: transform 0.15s var(--ease-press);
-}
-.mute-btn:active { transform: scale(0.9); }
-
-/* ========== ENTRY SCREEN ========== */
-.entry-paper {
-  width: 100%;
-  max-width: 420px;
-  border-radius: 8px;
-  padding: 32px 24px;
-  text-align: center;
-  transform: translateY(60px);
-  opacity: 0;
-  animation: paperDrop 0.7s var(--ease-diwan) 0.2s forwards;
-}
-
-@keyframes paperDrop {
-  from { transform: translateY(60px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.entry-title {
-  font-family: var(--font-display);
-  font-size: 3rem;
-  font-weight: 700;
-  color: var(--diwan-ink);
-  margin-bottom: 4px;
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 0.5s forwards;
-}
-.entry-subtitle {
-  font-size: 0.95rem;
-  color: var(--diwan-ink-soft);
-  margin-bottom: 24px;
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 0.65s forwards;
-}
-
-@keyframes seqReveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Photo slot in Entry */
-.photo-slot {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  border: 2.5px dashed var(--diwan-kraft);
-  margin: 0 auto 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-  position: relative;
-  background: var(--diwan-paper-soft);
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 0.8s forwards;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-.photo-slot:hover {
-  border-color: var(--diwan-ink);
-  box-shadow: 0 0 12px rgba(38,52,74,0.15);
-}
-.photo-slot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-.photo-slot .placeholder {
-  font-size: 2rem;
-  color: var(--diwan-kraft);
-}
-
-/* Name input */
-.name-input-wrap {
-  margin: 0 auto 20px;
-  max-width: 260px;
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 0.95s forwards;
-}
-.name-input {
-  width: 100%;
-  text-align: center;
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  color: var(--diwan-ink);
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid var(--diwan-kraft);
-  padding: 8px 4px;
-  outline: none;
-  transition: border-color 0.3s;
-}
-.name-input:focus { border-bottom-color: var(--diwan-ink); }
-.name-input::placeholder { color: var(--diwan-kraft); }
-
-/* Avatar grid */
-.avatar-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
-  max-width: 280px;
-  margin: 0 auto 24px;
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 1.1s forwards;
-}
-.avatar-stamp {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  border: 2px solid var(--diwan-kraft);
-  background: var(--diwan-paper-soft);
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s var(--ease-press);
-}
-.avatar-stamp:hover { transform: scale(1.1); }
-.avatar-stamp.selected {
-  border-color: var(--diwan-ink);
-  background: var(--diwan-ink);
-  box-shadow: 0 2px 8px rgba(38,52,74,0.3);
-  transform: scale(1.05);
-}
-
-/* Submit button */
-.submit-btn {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  padding: 12px 48px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: var(--diwan-kraft);
-  color: var(--diwan-paper-soft);
-  box-shadow: 0 4px 0 var(--diwan-kraft-dark);
-  transition: all 0.15s var(--ease-press);
-  opacity: 0;
-  animation: seqReveal 0.5s var(--ease-diwan) 1.25s forwards;
-}
-.submit-btn:disabled {
-  background: var(--diwan-kraft);
-  color: rgba(243,235,216,0.5);
-  cursor: not-allowed;
-  box-shadow: 0 4px 0 var(--diwan-kraft-dark);
-  transform: none;
-}
-.submit-btn:not(:disabled) {
-  background: var(--diwan-ink);
-  box-shadow: 0 4px 0 var(--diwan-ink-soft);
-  color: var(--diwan-paper);
-}
-.submit-btn:not(:disabled):active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--diwan-ink-soft);
-}
-
-/* Form glow */
-.form-glow {
-  position: absolute;
-  inset: -4px;
-  border-radius: 12px;
-  opacity: 0;
-  transition: opacity 0.5s;
-  pointer-events: none;
-  box-shadow: 0 0 20px var(--diwan-amber), 0 0 40px rgba(198,154,68,0.3);
-}
-.form-glow.active { opacity: 1; }
-
-/* ========== GAMEPLAY SCREEN ========== */
-.game-container {
-  width: 100%;
-  max-width: 460px;
-  padding: 0 16px;
-}
-
-/* Top bar */
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.streak-box {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--diwan-paper);
-  padding: 6px 14px;
-  border-radius: 8px;
-  border: 1.5px solid var(--diwan-kraft);
-  font-family: var(--font-display);
-  font-size: 1rem;
-}
-.streak-box .streak-fire { font-size: 1.1rem; }
-.powerups {
-  display: flex;
-  gap: 8px;
-}
-.powerup-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1.5px solid var(--diwan-kraft);
-  background: var(--diwan-paper);
-  font-family: var(--font-body);
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--diwan-ink);
-  cursor: pointer;
-  transition: all 0.2s var(--ease-press);
-  position: relative;
-}
-.powerup-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.powerup-btn:not(:disabled):active {
-  transform: scale(0.93);
-}
-.powerup-btn.fifty-fifty:not(:disabled) { border-color: var(--diwan-amber); }
-.powerup-btn.freeze:not(:disabled) { border-color: #4A90D9; }
-
-/* Freeze badge */
-.freeze-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #4A90D9;
-  color: white;
-  font-size: 0.65rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  animation: pulse 0.5s ease-in-out infinite alternate;
-}
-
-/* Candle timer */
-.candle-wrap {
-  text-align: center;
-  margin-bottom: 12px;
-}
-.candle-svg {
-  width: 50px;
-  height: 100px;
-}
-.candle-time {
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  color: var(--diwan-ink);
-  margin-top: 4px;
-}
-
-/* Flame flicker */
-@keyframes flicker {
-  0%, 100% { transform: scaleY(1) scaleX(1); }
-  25% { transform: scaleY(1.1) scaleX(0.9); }
-  50% { transform: scaleY(0.9) scaleX(1.1); }
-  75% { transform: scaleY(1.05) scaleX(0.95); }
-}
-@keyframes flickerFast {
-  0%, 100% { transform: scaleY(1) scaleX(1); }
-  20% { transform: scaleY(1.2) scaleX(0.8); }
-  40% { transform: scaleY(0.8) scaleX(1.2); }
-  60% { transform: scaleY(1.15) scaleX(0.85); }
-  80% { transform: scaleY(0.85) scaleX(1.15); }
-}
-.flame-normal { animation: flicker 0.4s ease-in-out infinite; transform-origin: bottom center; }
-.flame-urgent { animation: flickerFast 0.2s ease-in-out infinite; transform-origin: bottom center; }
-
-/* Question card */
-.question-card {
-  border-radius: 12px;
-  padding: 24px 20px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.cat-badge {
-  display: inline-block;
-  padding: 4px 14px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  margin-bottom: 12px;
-  color: white;
-}
-.cat-culture { background: var(--diwan-burnt); }
-.cat-sport { background: var(--diwan-success); }
-.cat-logic { background: var(--diwan-amber); }
-
-.question-text {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  line-height: 1.7;
-  margin-bottom: 20px;
-  color: var(--diwan-ink);
-}
-
-/* Options */
-.options-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.option-btn {
-  padding: 12px 8px;
-  border-radius: 10px;
-  border: 2px solid var(--diwan-kraft);
-  background: var(--diwan-paper-soft);
-  font-family: var(--font-body);
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--diwan-ink);
-  cursor: pointer;
-  transition: all 0.2s var(--ease-press);
-  position: relative;
-}
-.option-btn:hover:not(:disabled) {
-  border-color: var(--diwan-ink);
-  transform: translateY(-2px);
-  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-}
-.option-btn:active:not(:disabled) { transform: translateY(0); }
-.option-btn:disabled { cursor: default; }
-.option-btn.correct {
-  border-color: var(--diwan-success);
-  background: rgba(46,110,69,0.12);
-}
-.option-btn.wrong {
-  border-color: var(--diwan-error);
-  background: rgba(166,54,42,0.12);
-}
-.option-btn.strikethrough {
-  text-decoration: line-through;
-  opacity: 0.35;
-  pointer-events: none;
-}
-
-/* Stamp animation */
-.stamp-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0) rotate(-15deg);
-  font-family: var(--font-display);
-  font-size: 2.5rem;
-  font-weight: 700;
-  padding: 8px 20px;
-  border-radius: 8px;
-  border: 4px solid;
-  opacity: 0;
-  pointer-events: none;
-  z-index: 10;
-}
-.stamp-overlay.stamp-success {
-  color: var(--diwan-success);
-  border-color: var(--diwan-success);
-  background: rgba(46,110,69,0.08);
-}
-.stamp-overlay.stamp-error {
-  color: var(--diwan-error);
-  border-color: var(--diwan-error);
-  background: rgba(166,54,42,0.08);
-}
-.stamp-overlay.animate {
-  animation: stampIn 0.4s var(--ease-diwan) forwards;
-}
-@keyframes stampIn {
-  from { transform: translate(-50%, -50%) scale(0) rotate(-15deg); opacity: 0; }
-  to { transform: translate(-50%, -50%) scale(1) rotate(-8deg); opacity: 1; }
-}
-
-/* Shake */
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-6px); }
-  80% { transform: translateX(6px); }
-}
-.shake { animation: shake 0.4s ease-out; }
-
-/* Float points */
-.float-points {
-  position: fixed;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--diwan-success);
-  pointer-events: none;
-  z-index: 100;
-  animation: floatUp 1s ease-out forwards;
-}
-@keyframes floatUp {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-60px); }
-}
-
-/* Streak notification */
-.streak-notif {
-  position: fixed;
-  top: 20%;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--font-display);
-  font-size: 1.3rem;
-  padding: 10px 24px;
-  border-radius: 12px;
-  background: var(--diwan-amber);
-  color: white;
-  z-index: 200;
-  animation: streakPop 1.5s var(--ease-diwan) forwards;
-  pointer-events: none;
-}
-@keyframes streakPop {
-  0% { opacity: 0; transform: translateX(-50%) scale(0.5); }
-  20% { opacity: 1; transform: translateX(-50%) scale(1.1); }
-  40% { transform: translateX(-50%) scale(1); }
-  80% { opacity: 1; }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-}
-
-/* Slide card */
-@keyframes slideInRight {
-  from { transform: translateX(80px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-@keyframes slideOutLeft {
-  from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(-80px); opacity: 0; }
-}
-.card-slide-in { animation: slideInRight 0.35s var(--ease-diwan) forwards; }
-.card-slide-out { animation: slideOutLeft 0.25s ease-in forwards; }
-
-/* ========== BONUS SCREEN ========== */
-.bonus-intro {
-  width: 100%;
-  max-width: 420px;
-  border-radius: 12px;
-  padding: 32px 24px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-}
-.bonus-intro-bg {
-  background: var(--diwan-kraft-dark);
-  color: var(--diwan-paper);
-  border-color: var(--diwan-desk-dark);
-}
-.secret-stamp {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  color: rgba(235,224,198,0.25);
-  transform: rotate(-25deg);
-  border: 3px solid rgba(235,224,198,0.25);
-  padding: 4px 14px;
-  border-radius: 6px;
-  pointer-events: none;
-}
-.bonus-title {
-  font-family: var(--font-display);
-  font-size: 1.6rem;
-  margin-bottom: 16px;
-}
-.bonus-rules {
-  font-size: 0.95rem;
-  margin-bottom: 24px;
-  opacity: 0.85;
-  line-height: 1.8;
-}
-.bonus-btns {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-.bonus-btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  cursor: pointer;
-  border: none;
-  transition: all 0.15s var(--ease-press);
-}
-.bonus-btn-risk {
-  background: var(--diwan-burnt);
-  color: var(--diwan-paper);
-  box-shadow: 0 3px 0 rgba(139,74,56,0.6);
-}
-.bonus-btn-skip {
-  background: var(--diwan-ink-soft);
-  color: var(--diwan-paper);
-  box-shadow: 0 3px 0 rgba(38,52,74,0.5);
-}
-.bonus-btn:active { transform: translateY(2px); }
-
-/* Bonus play */
-.bonus-score-indicator {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  margin-bottom: 12px;
-  transition: color 0.3s;
-}
-.bonus-score-indicator.pulse-green { animation: pulseGreen 0.5s; }
-.bonus-score-indicator.pulse-red { animation: pulseRed 0.5s; }
-@keyframes pulseGreen {
-  0% { color: var(--diwan-success); transform: scale(1.2); }
-  100% { color: inherit; transform: scale(1); }
-}
-@keyframes pulseRed {
-  0% { color: var(--diwan-error); transform: scale(1.2); }
-  100% { color: inherit; transform: scale(1); }
-}
-
-.progress-stamps {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-bottom: 16px;
-  font-size: 1.2rem;
-}
-.progress-stamps span {
-  opacity: 0.3;
-  transition: opacity 0.3s;
-}
-.progress-stamps span.done { opacity: 1; }
-.progress-stamps span.correct-stamp { color: var(--diwan-success); }
-.progress-stamps span.wrong-stamp { color: var(--diwan-error); }
-
-/* Bonus end */
-.bonus-end {
-  text-align: center;
-  padding: 32px;
-}
-.bonus-final-stamp {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  padding: 10px 30px;
-  border-radius: 10px;
-  border: 4px solid;
-  display: inline-block;
-  margin: 16px 0;
-  animation: stampIn 0.5s var(--ease-diwan) forwards;
-}
-.bonus-final-stamp.accepted {
-  color: var(--diwan-success);
-  border-color: var(--diwan-success);
-}
-.bonus-final-stamp.rejected {
-  color: var(--diwan-error);
-  border-color: var(--diwan-error);
-}
-
-/* ========== CERTIFICATE SCREEN ========== */
-.certificate-container {
-  width: 100%;
-  max-width: 440px;
-  transform: translateY(40px);
-  opacity: 0;
-}
-.certificate-container.unroll {
-  animation: unrollCert 0.8s var(--ease-diwan) forwards;
-}
-@keyframes unrollCert {
-  from { transform: translateY(40px) scaleY(0.3); opacity: 0; }
-  to { transform: translateY(0) scaleY(1); opacity: 1; }
-}
-
-.certificate {
-  position: relative;
-  padding: 28px 20px;
-  text-align: center;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-/* Decorative edges */
-.cert-edge-top, .cert-edge-bottom {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 14px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--diwan-kraft) 0px,
-    var(--diwan-kraft) 6px,
-    var(--diwan-paper) 6px,
-    var(--diwan-paper) 12px
-  );
-}
-.cert-edge-top { top: 0; }
-.cert-edge-bottom { bottom: 0; }
-
-.cert-inner {
-  border: 2px solid var(--diwan-ink);
-  outline: 2px dashed var(--diwan-kraft);
-  outline-offset: 6px;
-  padding: 24px 16px;
-  position: relative;
-}
-
-/* New Photo Slot - Rectangular 3:4 ID Style */
-.cert-photo-slot {
-  width: 105px;
-  height: 140px; 
-  margin: 0 auto 16px;
-  border: 3.5px solid var(--diwan-ink);
-  background: var(--diwan-paper-soft);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-/* Inner thin border */
-.cert-photo-slot::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border: 1px solid var(--diwan-ink);
-  pointer-events: none;
-}
-.cert-photo-slot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  position: relative;
-  z-index: 1;
-}
-#certPhotoPlaceholder {
-  font-size: 2.2rem;
-  color: var(--diwan-kraft);
-}
-
-.cert-eyebrow {
-  font-size: 0.8rem;
-  color: var(--diwan-ink-soft);
-  letter-spacing: 2px;
-  margin-bottom: 4px;
-}
-.cert-title {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  color: var(--diwan-ink);
-  margin-bottom: 8px;
-}
-.cert-name {
-  font-family: var(--font-display);
-  font-size: 1.8rem;
-  color: var(--diwan-burnt);
-  margin-bottom: 16px;
-}
-.cert-score-block {
-  margin: 16px 0;
-}
-.cert-score-num {
-  font-family: var(--font-display);
-  font-size: 3rem;
-  color: var(--diwan-ink);
-}
-.cert-score-label {
-  font-size: 0.85rem;
-  color: var(--diwan-ink-soft);
-}
-
-/* Random Egyptian Phrase */
-.cert-phrase {
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  color: var(--diwan-ink);
-  margin-top: 10px;
-  opacity: 0;
-  animation: fadeUpPhrase 0.6s var(--ease-diwan) 1.2s forwards;
-}
-@keyframes fadeUpPhrase {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Dynamic Tier Stamps */
-.cert-stamp {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 12px auto;
-  animation: boomStamp 0.6s var(--ease-diwan) forwards;
-  background: rgba(255, 255, 255, 0.2);
-}
-@keyframes boomStamp {
-  0% { transform: scale(0) rotate(-30deg); opacity: 0; }
-  50% { transform: scale(1.2) rotate(5deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0deg); opacity: 1; }
-}
-
-/* 90-100% */
-.stamp-excellent {
-  width: 90px;
-  height: 90px;
-  color: var(--diwan-amber);
-  border: 4px double var(--diwan-amber);
-  border-radius: 50%;
-  outline: 2px dashed var(--diwan-amber);
-  outline-offset: 3px;
-}
-/* 75-89% */
-.stamp-vgood {
-  width: 85px;
-  height: 85px;
-  color: var(--diwan-success);
-  border: 3px solid var(--diwan-success);
-  border-radius: 50%;
-}
-/* 50-74% */
-.stamp-acceptable {
-  width: 100px;
-  height: 55px;
-  color: var(--diwan-ink);
-  border: 3px solid var(--diwan-ink);
-  border-radius: 4px;
-}
-/* 25-49% */
-.stamp-weak {
-  width: 100px;
-  height: 55px;
-  color: var(--diwan-burnt);
-  border: 3px dashed var(--diwan-burnt);
-  border-radius: 4px;
-}
-/* 0-24% */
-.stamp-rejected {
-  width: 100px;
-  height: 55px;
-  color: var(--diwan-error);
-  border: 3px solid var(--diwan-error);
-  border-radius: 4px;
-  position: relative;
-  overflow: hidden;
-}
-.stamp-rejected::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: -20%;
-  width: 140%;
-  height: 3px;
-  background-color: var(--diwan-error);
-  transform: translateY(-50%) rotate(-20deg);
-}
-
-/* Badges */
-.badges-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin: 16px 0;
-}
-.badge {
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  border-radius: 20px;
-  background: rgba(38,52,74,0.08);
-  color: var(--diwan-ink);
-  opacity: 0;
-  animation: badgeIn 0.4s var(--ease-diwan) forwards;
-}
-@keyframes badgeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Cert buttons */
-.cert-btns {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 20px;
-}
-.cert-btn {
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-family: var(--font-body);
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  border: none;
-  transition: all 0.15s var(--ease-press);
-}
-.cert-btn-share {
-  background: var(--diwan-ink);
-  color: var(--diwan-paper);
-}
-.cert-btn-download {
-  background: var(--diwan-success);
-  color: white;
-}
-.cert-btn:active { transform: scale(0.95); }
-
-/* ========== UTILITIES ========== */
-@keyframes pulse {
-  from { opacity: 1; }
-  to { opacity: 0.6; }
-}
-
-/* Score counter animation */
-.count-up {
-  display: inline-block;
-}
-
-/* Responsive */
-@media (max-width: 380px) {
-  .entry-title { font-size: 2.4rem; }
-  .options-grid { grid-template-columns: 1fr; }
-  .avatar-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .avatar-stamp { width: 42px; height: 42px; font-size: 1.3rem; }
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--diwan-desk); }
-::-webkit-scrollbar-thumb { background: var(--diwan-kraft); border-radius: 3px; }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
@@ -949,14 +19,14 @@ body::before {
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
 <!-- ==================== SCREEN 1: ENTRY ==================== -->
-<div class="screen active" id="screenEntry">
+<div class="screen active world" id="screenEntry">
   <div class="entry-paper paper-texture" id="entryPaper" style="position:relative;">
     <div class="form-glow" id="formGlow"></div>
     <div class="entry-title">الديوان</div>
     <div class="entry-subtitle">اختبر معلوماتك في ديوان الحكمة</div>
 
     <div class="photo-slot" id="photoSlot" onclick="document.getElementById('photoInput').click()">
-      <span class="placeholder" id="photoPlaceholder">📷</span>
+      <span class="placeholder" id="photoPlaceholder">●</span>
     </div>
 
     <div class="name-input-wrap">
@@ -965,44 +35,159 @@ body::before {
 
     <div class="avatar-grid" id="avatarGrid"></div>
 
+    <div class="sig-wrap">
+      <div class="sig-label">
+        <span>توقيعك (اختياري)</span>
+        <button class="sig-clear-btn" id="sigClearBtn" onclick="clearSignature()">امسح</button>
+      </div>
+      <canvas class="sig-canvas" id="sigCanvas" width="560" height="200"></canvas>
+    </div>
+
     <button class="submit-btn" id="submitBtn" disabled onclick="startGame()">ادخل الديوان</button>
+
+    <button class="hall-toggle-btn" id="hallToggleBtn" onclick="toggleHall()" aria-label="فتح لوحة الشرف">🏆 لوحة الشرف</button>
+
+    <div class="hall-panel" id="hallPanel" style="display:none;">
+      <div class="hall-title">🏆 لوحة الشرف</div>
+      <div class="hall-sub">أشطر موظفين الديوان — أعلى النقط</div>
+      <div class="hall-rows" id="hallRows"></div>
+      <div class="hall-foot">نتيجتك بتتسجل في اللوحة أول ما توصل لشهادة التقدير</div>
+    </div>
   </div>
 </div>
 
+
+<!-- ==================== SCREEN: DESK HUB (Prompt 1) ==================== -->
+<div class="screen" id="screenDesk">
+  <div class="desk-surface">
+    <div class="desk-title">المكتب</div>
+    <div class="desk-subtitle" id="deskSubtitle">اختر ملف للبدء</div>
+    <div class="dossier-stack" id="dossierStack">
+    </div>
+  </div>
+  <!-- ========== مشهد الديوان المرسوم — لوحة كاملة والعناصر الحية مقصوصة من اللوحة نفسها ========== -->
+  <div class="desk-scene" aria-hidden="true">
+    <div class="scene-canvas" id="sceneCanvas">
+
+      <!-- مروحة السقف المتحركة (اللوحة متولدة من غير مروحة عن قصد عشان دي تركب فوقيها) -->
+      <!-- الظل = نسخة مسطحة من نفس ريش المروحة (نفس viewBox ونفس المسارات) عشان الدوران يبان مرتبط بيها -->
+      <div class="fan-shadow" aria-hidden="true">
+        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
+          <g class="fan-shadow-blades">
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(120 120 45)"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(240 120 45)"/>
+            <circle cx="120" cy="45" r="14"/>
+          </g>
+        </svg>
+      </div>
+      <div class="scene-fan">
+        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="fanRodG" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#6B5836"/>
+              <stop offset=".5" stop-color="#9C8455"/>
+              <stop offset="1" stop-color="#544324"/>
+            </linearGradient>
+            <radialGradient id="fanHubG" cx=".38" cy=".3" r=".95">
+              <stop offset="0" stop-color="#C4A76E"/>
+              <stop offset="1" stop-color="#5A4728"/>
+            </radialGradient>
+            <linearGradient id="bladeG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#7A6540"/>
+              <stop offset=".55" stop-color="#5E4C2C"/>
+              <stop offset="1" stop-color="#463822"/>
+            </linearGradient>
+          </defs>
+          <rect x="100" y="0" width="40" height="10" rx="4" fill="#3A2E1C"/>
+          <rect x="113" y="8" width="14" height="26" rx="6" fill="url(#fanRodG)"/>
+          <ellipse cx="120" cy="47" rx="32" ry="17" fill="#5A4A2E"/>
+          <ellipse cx="120" cy="43" rx="32" ry="14" fill="#6E5A38"/>
+          <ellipse cx="120" cy="41" rx="26" ry="9" fill="#7E6A44"/>
+          <g class="fan-blades">
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(120 120 45)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(120 120 45)"/>
+            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(240 120 45)"/>
+            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(240 120 45)"/>
+          </g>
+          <circle cx="120" cy="45" r="12" fill="url(#fanHubG)"/>
+          <circle cx="120" cy="45" r="4.5" fill="#3A2E1C"/>
+        </svg>
+      </div>
+
+      <!-- توهج دافي من لمبات النحاس -->
+      <span class="lamp-glow glow-1"></span>
+      <span class="lamp-glow glow-2"></span>
+
+      <!-- ساعة الحيطة — عقاربها بتتحرك ببالوقت الحقيقي -->
+      <div class="scene-clock">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="50" cy="50" r="49" fill="#3E3020"/>
+          <circle cx="50" cy="50" r="45" fill="#5C4A2C"/>
+          <circle cx="50" cy="50" r="41" fill="#F5EFDD"/>
+          <g stroke="#4A3A22" stroke-width="2.4" stroke-linecap="round">
+            <line x1="50" y1="12" x2="50" y2="17.5"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(30 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(60 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(90 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(120 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(150 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(180 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(210 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(240 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(270 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(300 50 50)"/>
+            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(330 50 50)"/>
+          </g>
+          <line class="hand hand-h" x1="50" y1="52" x2="50" y2="29" stroke="#33270F" stroke-width="4.6" stroke-linecap="round"/>
+          <line class="hand hand-m" x1="50" y1="52" x2="50" y2="18" stroke="#33270F" stroke-width="3.2" stroke-linecap="round"/>
+          <line class="hand hand-s" x1="50" y1="56" x2="50" y2="14.5" stroke="#A6362A" stroke-width="1.5"/>
+          <circle cx="50" cy="50" r="3.4" fill="#33270F"/>
+          <circle cx="50" cy="50" r="1.5" fill="#A6362A"/>
+        </svg>
+      </div>
+
+      <!-- ذرات غبار عايمة في ضوء اللمبات -->
+      <span class="motes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+
+      <!-- القصاصات التفاعلية: كلها أبناء الكانفاس مباشرة عشان نسبها تطابق الرسم في كل المقاسات -->
+      <button class="prop-sprite sp-phone" tabindex="-1" onclick="window.DeskProps&&DeskProps.ring(event)" title="هاتف المصالح — دوس واسمع الرن" aria-label="هاتف المصالح"></button>
+      <button class="prop-sprite sp-tea" tabindex="-1" onclick="window.DeskProps&&DeskProps.stir(event)" title="شاي؟ دوس وجرب" aria-label="استكان شاي">
+        <span class="tea-steam"><i></i><i></i><i></i><i></i></span>
+      </button>
+      <button class="prop-sprite sp-nuts" tabindex="-1" onclick="window.DeskProps&&DeskProps.crack(event)" title="سوداني! دوس اكشش" aria-label="طبق سوداني"></button>
+      <button class="prop-sprite sp-stamp" tabindex="-1" onclick="window.DeskProps&&DeskProps.hit(event)" title="ادوس بالختم" aria-label="ختم ونهاسة"></button>
+      <button class="prop-sprite sp-papers" tabindex="-1" onclick="window.DeskProps&&DeskProps.flutter(event)" title="ورق رسمي مربوط" aria-label="أوراق رسمية"></button>
+
+      <!-- طبقة تعتيم: لمبة الكهرباء بتنقط أحيانًا زي فكة الوزارات -->
+      <div class="scene-dim" id="sceneDim"></div>
+    </div>
+  </div>
+
+  <div class="desk-bg-overlay" id="deskBgOverlay"></div>
+</div>
+
 <!-- ==================== SCREEN 2: GAMEPLAY ==================== -->
-<div class="screen" id="screenGame">
+<div class="screen world" id="screenGame">
   <div class="game-container">
+    <button class="desk-back-btn" onclick="exitDocToDesk()">◄ المكتب</button>
     <!-- Top bar -->
     <div class="top-bar">
       <div class="streak-box">
-        <span class="streak-fire">🔥</span>
+        <span class="streak-fire">★</span>
         <span id="streakNum">0</span>
       </div>
       <div class="powerups">
-        <button class="powerup-btn fifty-fifty" id="btnFifty" onclick="useFiftyFifty()">50/50</button>
-        <button class="powerup-btn freeze" id="btnFreeze" onclick="useFreeze()">❄️ ثبت</button>
+        <button class="powerup-btn fifty-futta" id="btnFifty" onclick="useFiftyFifty()" aria-label="فطة تمسح إجابتين غلط" title="فطة! نمسحلك إجابتين غلط">🧽 فطة</button>
+        <button class="powerup-btn wasta" id="btnWasta" onclick="useWasta()" aria-label="واسطة تخطي السؤال" title="واسطة! تعدي السؤال ده من غير غلطة">🤝 واسطة</button>
+        <button class="powerup-btn tea" id="btnBribe" onclick="useBribe()" aria-label="شاي مع الممتحن يكسب تلميح" title="تتشاي مع الممتحن بـ 15 نقطة ويسرّبلك تلميح">☕ شاي</button>
       </div>
     </div>
 
-    <!-- Candle timer -->
+    <!-- Time bar — الشمعة والكومة اتشالوا (كانوا واخدين مساحة ببلاش) والشريط الملوّن بيؤدي نفس الوظيفة -->
     <div class="candle-wrap">
-      <svg class="candle-svg" viewBox="0 0 50 100" id="candleSvg">
-        <!-- Candle body -->
-        <rect x="18" y="40" width="14" height="55" rx="3" fill="#E8D5A3" stroke="#C6A876" stroke-width="1"/>
-        <!-- Wax drip -->
-        <ellipse cx="18" cy="42" rx="3" ry="5" fill="#E8D5A3"/>
-        <ellipse cx="32" cy="45" rx="2.5" ry="4" fill="#E8D5A3"/>
-        <!-- Candle top (shrinks) -->
-        <rect id="candleWax" x="20" y="20" width="10" height="20" rx="2" fill="#F5E6C8"/>
-        <!-- Wick -->
-        <line x1="25" y1="18" x2="25" y2="22" stroke="#4A3728" stroke-width="1.5"/>
-        <!-- Flame -->
-        <g id="flameGroup" class="flame-normal" transform-origin="25 14">
-          <ellipse cx="25" cy="10" rx="5" ry="8" fill="#FFB347" opacity="0.9"/>
-          <ellipse cx="25" cy="9" rx="3" ry="5" fill="#FF6B35" opacity="0.8"/>
-          <ellipse cx="25" cy="8" rx="1.5" ry="3" fill="#FFF5E1"/>
-        </g>
-      </svg>
       <div class="candle-time" id="candleTime">15</div>
     </div>
 
@@ -1010,21 +195,50 @@ body::before {
     <div class="question-card paper-texture" id="questionCard">
       <div id="catBadge" class="cat-badge"></div>
       <div class="question-text" id="questionText"></div>
-      <div class="options-grid" id="optionsGrid"></div>
+      <div class="options-grid" id="optionsGrid" role="group" aria-label="خيارات الإجابة"></div>
+      <div class="order-grid" id="orderGrid" style="display:none;"></div>
+      <button class="order-submit-btn" id="orderSubmitBtn" onclick="submitOrderAnswer()" style="display:none;">رتّب وأرسل</button>
+      <div class="text-answer-wrap" id="textAnswerWrap" style="display:none;">
+        <input type="text" class="text-answer-input" id="textAnswerInput" placeholder="اكتب إجابتك..." autocomplete="off" onkeydown="if(event.key==='Enter')submitTextAnswer()">
+        <button class="text-submit-btn" onclick="submitTextAnswer()">أرسل</button>
+      </div>
+      <button class="appeal-btn" id="appealBtn" onclick="useAppeal()" style="display:none;">تطلب استئناف؟ (+10 ثواني، رسوم 30%)</button>
+      <div class="hint-note" id="hintNote" style="display:none;"></div>
+      <div class="margin-note" id="marginNote" style="display:none;"></div>
       <div class="stamp-overlay" id="stampOverlay"></div>
+      <!-- Bribe confirmation overlay -->
+      <div class="bribe-confirm" id="bribeConfirm">
+        <div class="bribe-confirm-text">تدفع 15 نقطة تتشاي مع الممتحن ويسرّبلك تلميح؟ ☕</div>
+        <div class="bribe-confirm-btns">
+          <button class="bribe-confirm-btn bribe-confirm-yes" onclick="confirmBribe()">اتفضل يا فندم</button>
+          <button class="bribe-confirm-btn bribe-confirm-no" onclick="cancelBribe()">لأ، سيبني</button>
+        </div>
+      </div>
+      <!-- Second Witness overlay -->
+      <div class="witness-card" id="witnessCard">
+        <div class="witness-title">متأكد؟<br>عندك ٥ ثواني تغيّر رأيك أو تثبته</div>
+        <div class="witness-timer-wrap">
+          <div class="witness-timer-bar"><div class="witness-timer-fill" id="witnessTimerFill"></div></div>
+          <span class="witness-timer-num" id="witnessTimerNum">5</span>
+        </div>
+        <div class="witness-btns">
+          <button class="witness-btn witness-btn-confirm" onclick="confirmWitness()">أثبت إجابتي</button>
+          <button class="witness-btn witness-btn-change" onclick="changeWitness()">أغيّرها</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- ==================== SCREEN 3: BONUS ==================== -->
-<div class="screen" id="screenBonus">
+<div class="screen world" id="screenBonus">
   <!-- Bonus Intro -->
   <div id="bonusIntro" class="bonus-intro bonus-intro-bg paper-texture">
     <div class="secret-stamp">سرّي</div>
-    <div class="bonus-title">⚠️ جاهز للمخاطرة؟</div>
+    <div class="bonus-title">▲ جاهز للمخاطرة؟</div>
     <div class="bonus-rules">
-      إجابة صح: <strong style="color:#6BCB77;">+15</strong> نقطة<br>
-      إجابة غلط: <strong style="color:#FF6B6B;">-10</strong> نقطة
+      🎯 تحدي العباقرة — 7 أسئلة مركبة · دقيقة ونصف لكل سؤال<br>
+      إجابة صح: <strong style="color:#6BCB77;">+20</strong> نقطة · إجابة غلط: <strong style="color:#FF6B6B;">-12</strong> نقطة — خمّن من غير ما تعرف وانت خسران!
     </div>
     <div class="bonus-btns">
       <button class="bonus-btn bonus-btn-risk" onclick="startBonusPlay()">يلا مخاطرة</button>
@@ -1034,7 +248,10 @@ body::before {
 
   <!-- Bonus Play -->
   <div id="bonusPlay" style="display:none; width:100%; max-width:460px; padding:0 16px;">
-    <div class="bonus-score-indicator" id="bonusScoreInd">0</div>
+    <div class="bonus-hud">
+      <div class="bonus-score-indicator" id="bonusScoreInd">0</div>
+      <div class="candle-time" id="bonusTime">1:30</div>
+    </div>
     <div class="progress-stamps" id="bonusStamps"></div>
     <div class="question-card paper-texture" id="bonusCard" style="position:relative; overflow:hidden;">
       <div class="question-text" id="bonusQText"></div>
@@ -1049,866 +266,115 @@ body::before {
       <div style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:8px;">نتيجة المخاطرة</div>
       <div style="font-family:var(--font-display); font-size:2.5rem; margin-bottom:4px;" id="bonusFinalScore">0</div>
       <div id="bonusFinalStampWrap"></div>
-      <button class="bonus-btn bonus-btn-skip" style="margin-top:20px;" onclick="goToCertificate()">شوف الشهادة</button>
+      <div class="bonus-btns" style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+        <button class="bonus-btn bonus-btn-risk" onclick="openGeniusExplanations()">📖 الاجابات التفصيلية</button>
+        <button class="bonus-btn bonus-btn-skip" onclick="goToCertificate()">شوف الشهادة</button>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- ==================== SCREEN 4: CERTIFICATE ==================== -->
-<div class="screen" id="screenCert">
+<div class="screen world" id="screenCert">
   <div class="certificate-container" id="certContainer">
     <div class="certificate paper-texture" id="certPaper">
       <div class="cert-edge-top"></div>
       <div class="cert-edge-bottom"></div>
+      <div class="cert-edge-left"></div>
+      <div class="cert-edge-right"></div>
       <div class="cert-inner">
-        <!-- New rectangular dynamic photo slot -->
-        <div class="cert-photo-slot" id="certPhotoSlot" onclick="document.getElementById('photoInput').click()">
-          <span id="certPhotoPlaceholder">📷</span>
+        <!-- شبكة الزخرفة التقاطعية اتشالت نهائيًا — كانت بتظهر كشبكة في الصورة المحملة والمستخدم مش عايزها -->
+        <!-- Right column: Photo + Signature (appears on right in RTL) -->
+        <div class="cert-left-col">
+          <div class="cert-photo-slot" id="certPhotoSlot" onclick="document.getElementById('certPhotoInput').click()">
+            <span id="certPhotoPlaceholder">●</span>
+            <input type="file" id="certPhotoInput" accept="image/*" style="display:none">
+          </div>
+          <img class="cert-sig" id="certSig" style="display:none" alt="">
+          <div class="cert-damgha" id="certDamgha"></div>
         </div>
-        <div class="cert-eyebrow">شهادة تقدير — الديوان</div>
-        <div class="cert-title">نتائج التحدي النهائي</div>
-        <div class="cert-name" id="certName"></div>
-        <div class="cert-score-block">
-          <div class="cert-score-num" id="certScoreNum">0</div>
-          <div class="cert-score-label">نقطة</div>
+        <!-- Left column: All text content (appears on left in RTL) -->
+        <div class="cert-right-col">
+          <div class="cert-eyebrow">شهادة تقدير — الديوان</div>
+          <div class="cert-title">نتائج التحدي النهائي</div>
+          <div class="cert-name" id="certName"></div>
+          <div class="cert-score-block">
+            <div class="cert-score-num" id="certScoreNum">0</div>
+            <div class="cert-score-label">نقطة</div>
+            <div class="cert-percent" id="certPercent"></div>
+          </div>
           <div class="cert-phrase" id="certPhrase"></div>
+          <div class="cert-stamp" id="certStamp"></div>
+          <div class="badges-row" id="badgesRow"></div>
+          <!-- المرفقات (Prompt 5) -->
+          <div class="enclosures-section" id="enclosuresSection" style="display:none">
+            <div class="enclosures-title">المرفقات</div>
+            <div class="enclosures-row" id="enclosuresRow"></div>
+          </div>
+          <!-- رقم مرجعي رسمي (Prompt 6) -->
+          <div class="cert-ref-number" id="certRefNumber"></div>
+          <!-- سطر لوحة الشرف -->
+          <div class="cert-hall-line" id="certHallLine"></div>
         </div>
-        <div class="cert-stamp" id="certStamp"></div>
-        <div class="badges-row" id="badgesRow"></div>
       </div>
     </div>
     <div class="cert-btns">
-      <button class="cert-btn cert-btn-share" onclick="shareCert()">📤 شارك</button>
-      <button class="cert-btn cert-btn-download" onclick="downloadCert()">📥 حمّل</button>
+      <button class="cert-btn cert-btn-share" onclick="shareCert()">▶ شارك</button>
+      <button class="cert-btn cert-btn-download" onclick="downloadCert()">◀ حمّل</button>
+      <button class="cert-btn cert-btn-back" onclick="returnToDeskFromCert()">↩ الرجوع للمكتب</button>
     </div>
   </div>
 </div>
 
-<script>
-// ==================== POINTS CONFIG ====================
-const GAME_POINTS = {
-  mainCorrect: 10,
-  bonusCorrect: 15,
-  bonusWrong: 10
-};
 
-// ==================== STATE ====================
-const state = {
-  playerName: '',
-  playerAvatar: '',
-  playerPhoto: '',
-  mainScore: 0,
-  bonusScore: 0,
-  totalScore: 0,
-  correctCount: 0,
-  wrongCount: 0,
-  maxStreak: 0,
-  currentStreak: 0,
-  answerTimes: [],
-  hasFifty: true,
-  hasFreeze: true,
-  freezeActive: false,
-  isMuted: localStorage.getItem('diwanMuted') === 'true',
-  currentQuestion: 0,
-  bonusCurrentQ: 0,
-  bonusCorrect: 0,
-  bonusWrong: 0,
-  bonusPlayed: false,
-};
-
-// ==================== QUESTIONS ====================
-const mainQuestions = [
-  { cat:'culture', catLabel:'ثقافة عامة', text:'إيه اسم أول رئيس لجمهورية مصر العربية؟', options:['محمد نجيب','جمال عبدالناصر','أنور السادات','حسني مبارك'], correct:0 },
-  { cat:'sport', catLabel:'رياضة ومعادلة', text:'كام لاعب في فريق كرة القدم داخل الملعب؟', options:['9','10','11','12'], correct:2 },
-  { cat:'logic', catLabel:'لغز تفكير', text:'إيه اللي بيزيد كل ما تاخد منه؟', options:['الحفرة','الوقت','المال','العمر'], correct:0 },
-  { cat:'culture', catLabel:'ثقافة عامة', text:'نهر النيل بيصب في إيه؟', options:['الخليج العربي','البحر الأحمر','البحر المتوسط','المحيط الأطلنطي'], correct:2 },
-  { cat:'logic', catLabel:'لغز تفكير', text:'شيء له أسنان ومايعضّش؟', options:['التمساح','المشط','السكين','الثعبان'], correct:1 },
-];
-
-const bonusQuestions = [
-  { text:'كام قارة في العالم؟', options:['5','6','7','4'], correct:2 },
-  { text:'إيه أكبر محيط في الأرض؟', options:['الأطلنطي','الهندي','الهادي','المتجمد الشمالي'], correct:2 },
-  { text:'مين اللي اخترع المصباح الكهربائي؟', options:['نيوتن','أديسون','أينشتاين','تسلا'], correct:1 },
-  { text:'كام لون في قوس قزح؟', options:['5','6','7','8'], correct:2 },
-];
-
-// ==================== SOUND SYSTEM ====================
-let audioCtx = null;
-function getAudioCtx() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  return audioCtx;
-}
-
-function playSound(fn) {
-  if (state.isMuted) return;
-  try { fn(getAudioCtx()); } catch(e) {}
-}
-
-const Sound = {
-  penTap() {
-    playSound(ctx => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 800;
-      gain.gain.value = 0.15;
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.06);
-    });
-  },
-
-  stamp(type) {
-    playSound(ctx => {
-      const bufSize = ctx.sampleRate * 0.15;
-      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
-      const noise = ctx.createBufferSource();
-      noise.buffer = buf;
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.value = 0.2;
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      noise.connect(noiseGain).connect(ctx.destination);
-      noise.start(); noise.stop(ctx.currentTime + 0.15);
-
-      const osc = ctx.createOscillator();
-      const oscGain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = type === 'success' ? 120 : 90;
-      oscGain.gain.value = 0.4;
-      oscGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-      osc.connect(oscGain).connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.2);
-    });
-  },
-
-  paperRustle() {
-    playSound(ctx => {
-      const bufSize = ctx.sampleRate * 0.3;
-      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
-      const noise = ctx.createBufferSource();
-      noise.buffer = buf;
-      const hp = ctx.createBiquadFilter();
-      hp.type = 'highpass';
-      hp.frequency.value = 3000;
-      const gain = ctx.createGain();
-      gain.gain.value = 0.08;
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      noise.connect(hp).connect(gain).connect(ctx.destination);
-      noise.start(); noise.stop(ctx.currentTime + 0.3);
-    });
-  },
-
-  tick() {
-    playSound(ctx => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 1200;
-      gain.gain.value = 0.1;
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.04);
-    });
-  },
-
-  unroll() {
-    playSound(ctx => {
-      const bufSize = ctx.sampleRate * 0.6;
-      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
-      const noise = ctx.createBufferSource();
-      noise.buffer = buf;
-      const bp = ctx.createBiquadFilter();
-      bp.type = 'bandpass';
-      bp.frequency.value = 1000;
-      bp.Q.value = 0.5;
-      bp.frequency.linearRampToValueAtTime(4000, ctx.currentTime + 0.6);
-      const gain = ctx.createGain();
-      gain.gain.value = 0.12;
-      gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-      noise.connect(bp).connect(gain).connect(ctx.destination);
-      noise.start(); noise.stop(ctx.currentTime + 0.6);
-    });
-  }
-};
-
-// ==================== MUTE ====================
-function toggleMute() {
-  state.isMuted = !state.isMuted;
-  localStorage.setItem('diwanMuted', state.isMuted);
-  document.getElementById('muteBtn').textContent = state.isMuted ? '🔇' : '🔊';
-}
-if (state.isMuted) document.getElementById('muteBtn').textContent = '🔇';
-
-// ==================== SCREEN TRANSITIONS ====================
-function switchScreen(from, to) {
-  const fromEl = document.getElementById(from);
-  const toEl = document.getElementById(to);
-  fromEl.classList.add('fade-out');
-  setTimeout(() => {
-    fromEl.classList.remove('active', 'fade-out');
-    fromEl.style.display = 'none';
-    toEl.style.display = '';
-    toEl.classList.add('active');
-  }, 350);
-}
-
-// ==================== ENTRY SCREEN ====================
-const avatars = ['🪔','🫖','🔑','📎','🥁','📜','🕯️','🧭','🎟️','🖋️'];
-const avatarGrid = document.getElementById('avatarGrid');
-avatars.forEach((emoji, i) => {
-  const btn = document.createElement('button');
-  btn.className = 'avatar-stamp';
-  btn.textContent = emoji;
-  btn.onclick = () => selectAvatar(i, emoji);
-  avatarGrid.appendChild(btn);
-});
-
-function selectAvatar(index, emoji) {
-  Sound.penTap();
-  document.querySelectorAll('.avatar-stamp').forEach((b, i) => {
-    b.classList.toggle('selected', i === index);
-  });
-  state.playerAvatar = emoji;
-  checkEntryForm();
-}
-
-document.getElementById('nameInput').addEventListener('input', function() {
-  checkEntryForm();
-});
-
-function checkEntryForm() {
-  const name = document.getElementById('nameInput').value.trim();
-  const hasAvatar = !!state.playerAvatar;
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = !(name && hasAvatar);
-  document.getElementById('formGlow').classList.toggle('active', name && hasAvatar);
-}
-
-// ==================== PHOTO UPLOAD ====================
-document.getElementById('photoInput').addEventListener('change', function(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  
-  reader.onload = function(ev) {
-    state.playerPhoto = ev.target.result;
-    
-    const entrySlot = document.getElementById('photoSlot');
-    if (entrySlot) {
-      entrySlot.innerHTML = `<img src="${ev.target.result}" alt="صورة اللاعب">`;
-    }
-    
-    const certSlot = document.getElementById('certPhotoSlot');
-    if (certSlot) {
-      certSlot.innerHTML = `<img src="${ev.target.result}" alt="صورة اللاعب">`;
-    }
-    
-    Sound.penTap();
-  };
-  
-  reader.readAsDataURL(file);
-  e.target.value = '';
-});
-
-function startGame() {
-  state.playerName = document.getElementById('nameInput').value.trim();
-  Sound.stamp('success');
-  switchScreen('screenEntry', 'screenGame');
-  setTimeout(() => loadQuestion(0), 400);
-}
-
-// ==================== GAMEPLAY ENGINE ====================
-let timerInterval = null;
-let timeLeft = 15;
-let questionStartTime = 0;
-const QUESTION_TIME = 15;
-
-function loadQuestion(index) {
-  if (index >= mainQuestions.length) {
-    endMainGame();
-    return;
-  }
-  state.currentQuestion = index;
-  const q = mainQuestions[index];
-  questionStartTime = Date.now();
-
-  const card = document.getElementById('questionCard');
-  card.classList.remove('card-slide-in', 'card-slide-out');
-  void card.offsetWidth;
-  card.classList.add('card-slide-in');
-  Sound.paperRustle();
-
-  const badge = document.getElementById('catBadge');
-  badge.textContent = q.catLabel;
-  badge.className = 'cat-badge cat-' + q.cat;
-  document.getElementById('questionText').textContent = q.text;
-
-  const grid = document.getElementById('optionsGrid');
-  grid.innerHTML = '';
-  q.options.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'option-btn';
-    btn.textContent = opt;
-    btn.onclick = () => selectAnswer(i);
-    grid.appendChild(btn);
-  });
-
-  const stamp = document.getElementById('stampOverlay');
-  stamp.className = 'stamp-overlay';
-  stamp.textContent = '';
-  document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('strikethrough'));
-
-  startTimer();
-}
-
-function startTimer() {
-  clearInterval(timerInterval);
-  timeLeft = QUESTION_TIME;
-  updateTimerDisplay();
-  updateCandleVisual();
-
-  timerInterval = setInterval(() => {
-    if (state.freezeActive) return; 
-    timeLeft--;
-    updateTimerDisplay();
-    updateCandleVisual();
-    if (timeLeft <= 3 && timeLeft > 0) Sound.tick();
-    if (timeLeft <= 0) {
-      clearInterval(timerInterval);
-      handleTimeout();
-    }
-  }, 1000);
-}
-
-function updateTimerDisplay() { document.getElementById('candleTime').textContent = Math.max(0, timeLeft); }
-
-function updateCandleVisual() {
-  const pct = Math.max(0, timeLeft / QUESTION_TIME);
-  const wax = document.getElementById('candleWax');
-  const maxHeight = 20;
-  const curHeight = maxHeight * pct;
-  wax.setAttribute('height', curHeight);
-  wax.setAttribute('y', 20 + (maxHeight - curHeight));
-
-  const flame = document.getElementById('flameGroup');
-  if (pct < 0.33) {
-    flame.classList.remove('flame-normal');
-    flame.classList.add('flame-urgent');
-    document.getElementById('candleTime').style.color = 'var(--diwan-error)';
-  } else {
-    flame.classList.remove('flame-urgent');
-    flame.classList.add('flame-normal');
-    document.getElementById('candleTime').style.color = 'var(--diwan-ink)';
-  }
-  flame.style.opacity = timeLeft > 0 ? '1' : '0';
-}
-
-function handleTimeout() {
-  state.wrongCount++;
-  state.currentStreak = 0;
-  document.getElementById('streakNum').textContent = state.currentStreak;
-
-  showStamp('error', 'غلط');
-  Sound.stamp('error');
-
-  const card = document.getElementById('questionCard');
-  card.classList.add('shake');
-  setTimeout(() => card.classList.remove('shake'), 400);
-
-  const q = mainQuestions[state.currentQuestion];
-  const btns = document.querySelectorAll('#optionsGrid .option-btn');
-  btns.forEach((b, i) => {
-    b.disabled = true;
-    if (i === q.correct) b.classList.add('correct');
-  });
-
-  setTimeout(() => advanceQuestion(), 1500);
-}
-
-function selectAnswer(index) {
-  clearInterval(timerInterval);
-  const q = mainQuestions[state.currentQuestion];
-  const btns = document.querySelectorAll('#optionsGrid .option-btn');
-  const isCorrect = index === q.correct;
-
-  const answerTime = (Date.now() - questionStartTime) / 1000;
-  state.answerTimes.push(answerTime);
-  btns.forEach(b => b.disabled = true);
-
-  if (isCorrect) {
-    state.correctCount++;
-    state.mainScore += GAME_POINTS.mainCorrect;
-    state.currentStreak++;
-    if (state.currentStreak > state.maxStreak) state.maxStreak = state.currentStreak;
-    document.getElementById('streakNum').textContent = state.currentStreak;
-
-    btns[index].classList.add('correct');
-    showStamp('success', 'صح');
-    Sound.stamp('success');
-    showFloatPoints('+' + GAME_POINTS.mainCorrect);
-
-    if (state.currentStreak > 0 && state.currentStreak % 3 === 0) showStreakNotif(state.currentStreak);
-  } else {
-    state.wrongCount++;
-    state.currentStreak = 0;
-    document.getElementById('streakNum').textContent = state.currentStreak;
-
-    btns[index].classList.add('wrong');
-    btns[q.correct].classList.add('correct');
-    showStamp('error', 'غلط');
-    Sound.stamp('error');
-
-    const card = document.getElementById('questionCard');
-    card.classList.add('shake');
-    setTimeout(() => card.classList.remove('shake'), 400);
-  }
-
-  Sound.penTap();
-  setTimeout(() => advanceQuestion(), 1500);
-}
-
-function advanceQuestion() {
-  const card = document.getElementById('questionCard');
-  card.classList.remove('card-slide-in');
-  card.classList.add('card-slide-out');
-  Sound.paperRustle();
-  setTimeout(() => {
-    card.classList.remove('card-slide-out');
-    loadQuestion(state.currentQuestion + 1);
-  }, 300);
-}
-
-function showStamp(type, text) {
-  const stamp = document.getElementById('stampOverlay');
-  stamp.className = 'stamp-overlay stamp-' + type;
-  stamp.textContent = text;
-  void stamp.offsetWidth;
-  stamp.classList.add('animate');
-}
-
-function showFloatPoints(text) {
-  const el = document.createElement('div');
-  el.className = 'float-points';
-  el.textContent = text;
-  const card = document.getElementById('questionCard');
-  const rect = card.getBoundingClientRect();
-  el.style.left = (rect.left + rect.width / 2 - 20) + 'px';
-  el.style.top = (rect.top + rect.height / 2) + 'px';
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1000);
-}
-
-function showStreakNotif(streak) {
-  const el = document.createElement('div');
-  el.className = 'streak-notif';
-  el.textContent = `🔥 ستريك ${streak}!`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1500);
-}
-
-function useFiftyFifty() {
-  if (!state.hasFifty) return;
-  state.hasFifty = false;
-  document.getElementById('btnFifty').disabled = true;
-  Sound.penTap();
-  const q = mainQuestions[state.currentQuestion];
-  const btns = document.querySelectorAll('#optionsGrid .option-btn');
-  const indices = [0,1,2,3].filter(i => i !== q.correct);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [indices[i], indices[j]] = [indices[j], indices[i]];
-  }
-  indices.slice(0, 2).forEach(i => {
-    btns[i].classList.add('strikethrough');
-    btns[i].disabled = true;
-  });
-}
-
-function useFreeze() {
-  if (!state.hasFreeze) return;
-  state.hasFreeze = false;
-  document.getElementById('btnFreeze').disabled = true;
-  state.freezeActive = true;
-  Sound.penTap();
-  const btn = document.getElementById('btnFreeze');
-  const badge = document.createElement('span');
-  badge.className = 'freeze-badge';
-  badge.textContent = 'ثابت';
-  btn.appendChild(badge);
-  setTimeout(() => { state.freezeActive = false; badge.remove(); }, 4000);
-}
-
-function endMainGame() {
-  clearInterval(timerInterval);
-  switchScreen('screenGame', 'screenBonus');
-}
-
-// ==================== BONUS ROUND ====================
-function initBonusStamps() {
-  const container = document.getElementById('bonusStamps');
-  container.innerHTML = '';
-  bonusQuestions.forEach((_, i) => {
-    const span = document.createElement('span');
-    span.textContent = '●';
-    span.id = 'bonusStamp' + i;
-    container.appendChild(span);
-  });
-}
-
-function startBonusPlay() {
-  state.bonusPlayed = true;
-  Sound.stamp('success');
-  document.getElementById('bonusIntro').style.display = 'none';
-  document.getElementById('bonusPlay').style.display = 'block';
-  state.bonusCurrentQ = 0;
-  state.bonusCorrect = 0;
-  state.bonusWrong = 0;
-  state.bonusScore = 0;
-  initBonusStamps();
-  loadBonusQuestion(0);
-}
-
-function skipBonus() {
-  state.bonusPlayed = false;
-  Sound.penTap();
-  state.bonusScore = 0;
-  goToCertificate();
-}
-
-function loadBonusQuestion(index) {
-  if (index >= bonusQuestions.length) {
-    endBonusRound();
-    return;
-  }
-  state.bonusCurrentQ = index;
-  const q = bonusQuestions[index];
-
-  const card = document.getElementById('bonusCard');
-  card.classList.remove('card-slide-in');
-  void card.offsetWidth;
-  card.classList.add('card-slide-in');
-  Sound.paperRustle();
-
-  document.getElementById('bonusQText').textContent = q.text;
-  document.getElementById('bonusScoreInd').textContent = state.bonusScore;
-
-  const grid = document.getElementById('bonusOpts');
-  grid.innerHTML = '';
-  q.options.forEach((opt, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'option-btn';
-    btn.textContent = opt;
-    btn.onclick = () => selectBonusAnswer(i);
-    grid.appendChild(btn);
-  });
-
-  const stamp = document.getElementById('bonusStamp');
-  stamp.className = 'stamp-overlay';
-  stamp.textContent = '';
-  startBonusTimer();
-}
-
-let bonusTimerInterval = null;
-let bonusTimeLeft = 15;
-
-function startBonusTimer() {
-  clearInterval(bonusTimerInterval);
-  bonusTimeLeft = 15;
-  bonusTimerInterval = setInterval(() => {
-    bonusTimeLeft--;
-    if (bonusTimeLeft <= 3 && bonusTimeLeft > 0) Sound.tick();
-    if (bonusTimeLeft <= 0) {
-      clearInterval(bonusTimerInterval);
-      handleBonusTimeout();
-    }
-  }, 1000);
-}
-
-function handleBonusTimeout() {
-  state.bonusWrong++;
-  state.bonusScore -= GAME_POINTS.bonusWrong;
-  const q = bonusQuestions[state.bonusCurrentQ];
-
-  const stampEl = document.getElementById('bonusStamp' + state.bonusCurrentQ);
-  stampEl.classList.add('done', 'wrong-stamp');
-
-  const btns = document.querySelectorAll('#bonusOpts .option-btn');
-  btns.forEach((b, i) => {
-    b.disabled = true;
-    if (i === q.correct) b.classList.add('correct');
-  });
-
-  showBonusStamp('error', 'غلط');
-  Sound.stamp('error');
-  updateBonusScoreDisplay('red');
-  setTimeout(() => advanceBonusQuestion(), 1500);
-}
-
-function selectBonusAnswer(index) {
-  clearInterval(bonusTimerInterval);
-  const q = bonusQuestions[state.bonusCurrentQ];
-  const btns = document.querySelectorAll('#bonusOpts .option-btn');
-  const isCorrect = index === q.correct;
-
-  btns.forEach(b => b.disabled = true);
-
-  if (isCorrect) {
-    state.bonusCorrect++;
-    state.bonusScore += GAME_POINTS.bonusCorrect;
-    btns[index].classList.add('correct');
-    showBonusStamp('success', 'صح');
-    Sound.stamp('success');
-    showFloatPoints('+' + GAME_POINTS.bonusCorrect);
-    document.getElementById('bonusStamp' + state.bonusCurrentQ).classList.add('done', 'correct-stamp');
-  } else {
-    state.bonusWrong++;
-    state.bonusScore -= GAME_POINTS.bonusWrong;
-    btns[index].classList.add('wrong');
-    btns[q.correct].classList.add('correct');
-    showBonusStamp('error', 'غلط');
-    Sound.stamp('error');
-    document.getElementById('bonusStamp' + state.bonusCurrentQ).classList.add('done', 'wrong-stamp');
-    
-    const card = document.getElementById('bonusCard');
-    card.classList.add('shake');
-    setTimeout(() => card.classList.remove('shake'), 400);
-  }
-
-  Sound.penTap();
-  updateBonusScoreDisplay(isCorrect ? 'green' : 'red');
-  setTimeout(() => advanceBonusQuestion(), 1500);
-}
-
-function advanceBonusQuestion() {
-  const card = document.getElementById('bonusCard');
-  card.classList.remove('card-slide-in');
-  card.classList.add('card-slide-out');
-  Sound.paperRustle();
-  setTimeout(() => {
-    card.classList.remove('card-slide-out');
-    loadBonusQuestion(state.bonusCurrentQ + 1);
-  }, 300);
-}
-
-function showBonusStamp(type, text) {
-  const stamp = document.getElementById('bonusStamp');
-  stamp.className = 'stamp-overlay stamp-' + type;
-  stamp.textContent = text;
-  void stamp.offsetWidth;
-  stamp.classList.add('animate');
-}
-
-function updateBonusScoreDisplay(color) {
-  const ind = document.getElementById('bonusScoreInd');
-  ind.textContent = state.bonusScore;
-  ind.classList.remove('pulse-green', 'pulse-red');
-  void ind.offsetWidth;
-  ind.classList.add(color === 'green' ? 'pulse-green' : 'pulse-red');
-}
-
-function endBonusRound() {
-  clearInterval(bonusTimerInterval);
-  document.getElementById('bonusPlay').style.display = 'none';
-  document.getElementById('bonusEnd').style.display = 'block';
-  animateCounter('bonusFinalScore', state.bonusScore, 800);
-  const wrap = document.getElementById('bonusFinalStampWrap');
-  if (state.bonusScore > 0) {
-    wrap.innerHTML = '<div class="bonus-final-stamp accepted">مقبول</div>';
-  } else {
-    wrap.innerHTML = '<div class="bonus-final-stamp rejected">مرفوض</div>';
-  }
-}
-
-// ==================== DYNAMIC EVALUATION SYSTEM ====================
-const EVAL_PHRASES = {
-  excellent: [
-    "يا نهار أبيض، ده انت جامد يا معلم!",
-    "تسلم الأيادي بجد يا وحش",
-    "ما شاء الله عليك، مفيش كلام",
-    "ده احنا قدام عبقري ولا إيه؟"
-  ],
-  vgood: [
-    "مش بطال خالص، كمّل كده",
-    "تمام يا كبير، شغل نضيف",
-    "لسه شوية وتبقى فوق الكل",
-    "حلو أوي، بس المرة الجاية كمّلها امتياز"
-  ],
-  acceptable: [
-    "تمام كده، خلاص كفاية عليك",
-    "معقول يعني، مش وحش",
-    "على قد الحال، ولا يهمك",
-    "خدت نص الطريق، كمّل الباقي"
-  ],
-  weak: [
-    "يا سيدي إحنا مش هنقفل الملف كده",
-    "معلش يا كبير، وسّع دماغك شوية",
-    "فيه حاجة غلط في المذاكرة يا صاحبي",
-    "لسه قدامك مشوار يا نجم"
-  ],
-  rejected: [
-    "ارجع زي ما جيت يا باشا",
-    "يلا يفتح الله، بكرة أحسن",
-    "الملف اتقفل، جرب تاني يا كبير",
-    "معلش، مش كل مرة بتسلم الجرة"
-  ]
-};
-
-function getEvaluationData(playerScore, maxPossibleScore) {
-  let percentage = (playerScore / maxPossibleScore) * 100;
-  if (percentage < 0) percentage = 0;
-  if (percentage > 100) percentage = 100;
-
-  let tier = '';
-  let stampConfig = {};
-
-  if (percentage >= 90) {
-    tier = 'excellent';
-    stampConfig = { text: 'امتياز', shapeClass: 'stamp-excellent' };
-  } else if (percentage >= 75) {
-    tier = 'vgood';
-    stampConfig = { text: 'جيد جدًا', shapeClass: 'stamp-vgood' };
-  } else if (percentage >= 50) {
-    tier = 'acceptable';
-    stampConfig = { text: 'مقبول', shapeClass: 'stamp-acceptable' };
-  } else if (percentage >= 25) {
-    tier = 'weak';
-    stampConfig = { text: 'ضعيف', shapeClass: 'stamp-weak' };
-  } else {
-    tier = 'rejected';
-    stampConfig = { text: 'مرفوض', shapeClass: 'stamp-rejected' };
-  }
-
-  const phrases = EVAL_PHRASES[tier];
-  const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-
-  return { percentage, stampConfig, phrase };
-}
-
-// ==================== CERTIFICATE ====================
-function goToCertificate() {
-  Sound.penTap();
-  state.totalScore = state.mainScore + state.bonusScore;
-  switchScreen('screenBonus', 'screenCert');
-  setTimeout(() => renderCertificate(), 400);
-}
-
-function renderCertificate() {
-  Sound.unroll();
-  const container = document.getElementById('certContainer');
-  container.classList.add('unroll');
-
-  document.getElementById('certName').textContent = state.playerName;
-
-  if (state.playerPhoto) {
-    const slot = document.getElementById('certPhotoSlot');
-    slot.innerHTML = `<img src="${state.playerPhoto}" alt="صورة اللاعب">`;
-  }
-
-  let maxPossibleScore = mainQuestions.length * GAME_POINTS.mainCorrect;
-  if (state.bonusPlayed) {
-    maxPossibleScore += bonusQuestions.length * GAME_POINTS.bonusCorrect;
-  }
-
-  const evalData = getEvaluationData(state.totalScore, maxPossibleScore);
-
-  document.getElementById('certPhrase').textContent = evalData.phrase;
-
-  const stampEl = document.getElementById('certStamp');
-  stampEl.textContent = evalData.stampConfig.text;
-  stampEl.className = 'cert-stamp ' + evalData.stampConfig.shapeClass;
-  stampEl.style.animation = 'none';
-  void stampEl.offsetWidth;
-  stampEl.style.animation = '';
-
-  animateCounter('certScoreNum', state.totalScore, 1200);
-
-  const badges = calculateBadges();
-  const row = document.getElementById('badgesRow');
-  row.innerHTML = '';
-  badges.forEach((badge, i) => {
-    const el = document.createElement('span');
-    el.className = 'badge';
-    el.textContent = badge;
-    el.style.animationDelay = (0.8 + i * 0.2) + 's';
-    row.appendChild(el);
-  });
-}
-
-function calculateBadges() {
-  const badges = [];
-  const avgTime = state.answerTimes.length > 0
-    ? state.answerTimes.reduce((a, b) => a + b, 0) / state.answerTimes.length
-    : 999;
-  if (avgTime < 5) badges.push('⚡ سريع البديهة');
-  if (state.correctCount >= 4) badges.push('🧩 عبقري الألغاز');
-  if (state.maxStreak >= 3) badges.push('🔥 ما وقفش');
-  if (state.totalScore >= 80) badges.push('🏆 بطل الديوان');
-  if (state.bonusScore > 0) badges.push('💎 جولة المخاطرة');
-  return badges;
-}
-
-function animateCounter(elementId, target, duration) {
-  const el = document.getElementById(elementId);
-  const start = 0;
-  const startTime = Date.now();
-  function update() {
-    const elapsed = Date.now() - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(start + (target - start) * eased);
-    if (progress < 1) requestAnimationFrame(update);
-  }
-  update();
-}
-
-// ==================== SHARE & DOWNLOAD ====================
-function shareCert() {
-  Sound.penTap();
-  const text = `ديوان الحكمة — ${state.playerName} حصل على ${state.totalScore} نقطة! 🏆`;
-  if (navigator.share) {
-    navigator.share({ title: 'الديوان', text }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('تم النسخ!');
-    }).catch(() => {
-      alert(text);
-    });
-  }
-}
-
-function downloadCert() {
-  Sound.penTap();
-  const cert = document.getElementById('certPaper');
-  if (typeof html2canvas === 'undefined') {
-    alert('html2canvas غير متوفر');
-    return;
-  }
-  
-  // التأكد من تحميل الخطوط والعناصر تماماً ومنع ترحيل الموضع
-  document.fonts.ready.then(() => {
-    window.scrollTo(0, 0);
-    html2canvas(cert, {
-      backgroundColor: null,
-      scale: 2,
-      useCORS: true,
-      allowTaint: true,
-      scrollY: -window.scrollY
-    }).then(canvas => {
-      const link = document.createElement('a');
-      link.download = 'diwan-certificate.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }).catch(err => {
-      console.error('Download error:', err);
-    });
-  });
-}
-</script>
+<!-- Achievement Card Overlay (Prompt 4) -->
+<div class="achieve-overlay" id="achieveOverlay">
+  <div class="achieve-card" id="achieveCard">
+    <div class="achieve-stamp" id="achieveStamp"></div>
+    <div class="card-content" id="achieveContent">
+      <div class="achieve-doc-name" id="achieveDocName"></div>
+      <div class="achieve-score-line" id="achieveScoreLine"></div>
+      <div class="achieve-date" id="achieveDate"></div>
+      <div class="achieve-ref" id="achieveRef"></div>
+      <div class="achieve-btns">
+        <button class="achieve-back-btn achieve-explain-btn" onclick="openAchieveExplanations()">📖 الاجابات التفصيلية</button>
+        <button class="achieve-back-btn" onclick="closeAchievementCard()">رجوع للمكتب</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Envelope Overlay (Prompt 5) -->
+<div class="envelope-wrap" id="envelopeWrap">
+  <div class="envelope" id="envelope" onclick="openEnvelope()">
+    <div class="envelope-flap"></div>
+    <div class="envelope-body"></div>
+    <div class="envelope-seal">ديوان</div>
+    <div class="envelope-label">المظروف الختامي</div>
+  </div>
+</div>
+
+<!-- Card Review Overlay (Prompt 5 - enclosure preview) -->
+<div class="card-review-overlay" id="cardReviewOverlay" onclick="if(event.target===this)closeCardReview()">
+  <button class="card-review-close" onclick="closeCardReview()" aria-label="إغلاق المعاينة">✕</button>
+  <div id="cardReviewContent"></div>
+</div>
+
+<!-- الاجابات التفصيلية — بتظهر آخر كل ملف/قسم بعد ما يخلص -->
+<div class="explain-overlay" id="explainOverlay">
+  <div class="explain-card paper-texture">
+    <div class="explain-head">
+      <div class="explain-title" id="explainTitle">📖 الاجابات التفصيلية</div>
+      <div class="explain-sub" id="explainSub"></div>
+    </div>
+    <div class="explain-list" id="explainList"></div>
+    <button class="explain-close-btn" id="explainCloseBtn" onclick="closeExplainReview()">يلا نكمّل ←</button>
+  </div>
+</div>
+
+<script src="data/questions.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ambience.js"></script>
 </body>
 </html>
