@@ -536,13 +536,15 @@
       if (ch < h) { ch = h; cw = h * AR; }
       cv.style.width = cw + 'px';
       cv.style.height = ch + 'px';
-      // البورتريه: الكانفاس يتثبت على الشمال والمنطقة الظاهرة تتحدد بمتغيرات CSS
+      // البورتريه: الكانفاس يتثبت على نص اللوحة منزاح 4% — العناصر المرسومة على
+      // الحروف (تليفون/سوداني/شاي شمال، أوراق يمين) تخرج بره المجال، ومكانها
+      // عناصر SVG بمقاعد ثابتة في الشريط السفلي (Task 26 — كل عنصر في مكانه)
       const portrait = h > w;
-      cv.style.left = portrait ? '0px' : '50%';
-      cv.style.transform = portrait ? 'translate(0,-50%)' : 'translate(-50%,-50%)';
+      cv.style.left = '50%';
+      cv.style.transform = portrait ? 'translate(calc(-50% - 4%), -50%)' : 'translate(-50%,-50%)';
       const visW = Math.min(100, (w / cw) * 100);
       cv.style.setProperty('--vis-w', visW + '%');
-      cv.style.setProperty('--vis-cx', (visW / 2) + '%');
+      cv.style.setProperty('--vis-cx', portrait ? '54%' : '50%');
       // الوضع العرضي: الكانفاس بيفيض فوق وتحت — المروحة لازم تنزل لحد أول حاجة ظاهرة
       // (كانت متثبتة على أول اللوحة فبتتقص بره الشاشة ومكانش باين منها حاجة)
       const visTop = Math.max(0, (ch - h) / 2);

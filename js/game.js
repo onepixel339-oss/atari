@@ -509,14 +509,112 @@ function allDocsDone() {
 // Document states — keyed by setId (e.g. "culture-1")
 // state.activeSetId/earnedCards/docCorrectCounts معرّفة في state من الأول
 
-// Fixed random rotations for dossiers
-const DOSSIER_ROTATIONS = [-6, 2, 5];
-
 // رقم ملف رسمي بأرقام هندية — لمصة أرشيف مصري
 function fileSerial(i) {
   const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
   return 'ملف رقم ' + ar(41 + i * 7) + ' / ' + ar(2026);
 }
+
+// ==================== الملفات المرسومة (Task 25) ====================
+// وش الملف بقى رسمة SVG حية جوه اللعبة بتندمج مع لوحة المكتب —
+// folder-a.png اتشالت (Task 25): كانت صورة كرتون واقعية ملزوقة على رسمة جيبلي
+const FOLDER_PALETTES = {
+  'cat-culture': { base:'#C08750', dark:'#9A6A3C', flap:'#A9743F', edge:'#7E5430', hi:'#D9A76C' },
+  'cat-sport':   { base:'#8CA3BF', dark:'#6D87A6', flap:'#7790AF', edge:'#57708F', hi:'#A8BCD4' },
+  'cat-logic':   { base:'#9BB08D', dark:'#7C9470', flap:'#8AA07D', edge:'#5F7755', hi:'#B4C6A6' }
+};
+
+function folderArtSVG(cls, i) {
+  const P = FOLDER_PALETTES[cls] || FOLDER_PALETTES['cat-culture'];
+  const uid = 'f' + i; // معرّفات فريدة لكل ملف — الفلاتر مش بتتشارك
+  return '<svg class="folder-art" viewBox="0 0 460 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + '<defs>'
+    + '<linearGradient id="' + uid + 'b" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0" stop-color="' + P.hi + '"/><stop offset=".42" stop-color="' + P.base + '"/><stop offset="1" stop-color="' + P.dark + '"/></linearGradient>'
+    + '<linearGradient id="' + uid + 'f" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0" stop-color="' + P.flap + '"/><stop offset="1" stop-color="' + P.edge + '"/></linearGradient>'
+    + '<filter id="' + uid + 'g" x="0" y="0" width="100%" height="100%">'
+    + '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/>'
+    + '<feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.55 0.55 0.55 0 0"/>'
+    + '</filter>'
+    + '</defs>'
+    // ===== ورق أبيض طالع من جوه الملف من فوق — إحساس إن الملف مليان أوراق رسمية =====
+    + '<g>'
+    + '<rect x="30" y="46" width="360" height="66" rx="4" fill="#EFE5CB" stroke="#CDBE96" stroke-width="2" transform="rotate(-1.8 210 79)"/>'
+    + '<rect x="54" y="34" width="322" height="68" rx="4" fill="#F7EFDB" stroke="#D8CA9F" stroke-width="2" transform="rotate(1.2 215 68)"/>'
+    // سطور طباعة باهتة على أول ورقة
+    + '<line x1="96" y1="60" x2="330" y2="55" stroke="#C6B88E" stroke-width="2.4" transform="rotate(1.2 215 68)"/>'
+    + '<line x1="108" y1="74" x2="286" y2="71" stroke="#D3C6A0" stroke-width="2" transform="rotate(1.2 215 68)"/>'
+    + '</g>'
+    // ===== جسم الملف الكرتون — حافة فوق بتاب مرتفع في النص يمين (شكل مجلد حقيقي) =====
+    + '<path d="M16,110 Q16,92 33,91 L244,84 L262,52 Q265,45 274,46 L340,50 Q349,51 349,59 L350,78 L428,76 Q445,76 444,92 L446,264 Q446,282 429,283 Q225,292 34,284 Q17,283 16,266 Z" '
+    + 'fill="url(#' + uid + 'b)" stroke="' + P.edge + '" stroke-width="3"/>'
+    // ظل بسيط تحت حافة التاب — بيفصل التاب عن الجسم
+    + '<path d="M244,84 L262,52 Q265,45 274,46 L340,50 Q349,51 349,59 L350,78" fill="none" stroke="rgba(30,14,2,.22)" stroke-width="3.5"/>'
+    // سنّة الوش — شريط علوي داخل الملف بلون أغمق (طية الغلاف)
+    + '<path d="M18,102 Q230,90 442,92 L441,136 Q230,122 19,140 Z" fill="url(#' + uid + 'f)" opacity=".9"/>'
+    + '<path d="M19,140 Q230,122 441,136" fill="none" stroke="rgba(35,20,5,.28)" stroke-width="2.5"/>'
+    // لمعات الرسم واهتراء الورق
+    + '<path d="M26,104 Q230,93 434,96" fill="none" stroke="rgba(255,242,214,.28)" stroke-width="2.5"/>'
+    + '<ellipse cx="70" cy="234" rx="54" ry="26" fill="rgba(255,238,206,.12)"/>'
+    + '<ellipse cx="388" cy="110" rx="44" ry="18" fill="rgba(60,32,8,.10)"/>'
+    // رقعة الرقم الرسمي (نص file-serial بيقعد عليها)
+    + '<rect x="238" y="232" width="200" height="46" rx="8" fill="rgba(255,246,224,.32)"/>'
+    // خيط أحمر متربعط على زرار خشب — رسمة إيد بظل مرسوم
+    + '<g fill="none" stroke-linecap="round">'
+    + '<path d="M206,164 C182,134 278,122 262,162 C256,178 208,186 202,166" stroke="rgba(30,12,4,.20)" stroke-width="6" transform="translate(3,4)"/>'
+    + '<path d="M206,164 C182,134 278,122 262,162 C256,178 208,186 202,166" stroke="#A6362A" stroke-width="5"/>'
+    + '<path d="M252,166 C276,142 196,130 212,170 C218,186 264,190 268,168" stroke="rgba(30,12,4,.20)" stroke-width="6" transform="translate(3,4)"/>'
+    + '<path d="M252,166 C276,142 196,130 212,170 C218,186 264,190 268,168" stroke="#A6362A" stroke-width="5"/>'
+    + '<path d="M259,184 C268,200 258,218 244,228" stroke="#A6362A" stroke-width="4.5"/>'
+    + '</g>'
+    + '<circle cx="232" cy="168" r="17" fill="#8A5A34" stroke="#5E3C20" stroke-width="3"/>'
+    + '<circle cx="231" cy="166.5" r="15" fill="none" stroke="rgba(255,240,210,.22)" stroke-width="1.5"/>'
+    + '<circle cx="227" cy="164" r="2.6" fill="#3E2A14"/><circle cx="237" cy="172" r="2.6" fill="#3E2A14"/>'
+    // حبيبات ورق مرسومة
+    + '<rect x="0" y="0" width="460" height="300" filter="url(#' + uid + 'g)" opacity=".16"/>'
+    + '</svg>';
+}
+
+// توزيع الملفات على المكتب — مروحة راقدة على الديسكتوب، على الفون: صفّة متعرجة
+// الملفات أصغر وعايشة جوه المشهد (الشاي والسنب والتليفون باينين حواليها) — Task 26
+function deskIsPortrait() {
+  return !!(window.matchMedia && window.matchMedia('(max-width: 540px) and (orientation: portrait)').matches);
+}
+function deskOffsetsPure(portrait, i) {
+  if (portrait) {
+    // صفّة متعرجة: كل ملف جنب الشغال اللي فوقيه بشيبر — يمين وشمال بالتناوب
+    // والمسافة الأوسع (28px) بتفضح المشهد بين الملفات بدل ما تتغطى عليه
+    const lefts = ['46%', '59%', '42%'];
+    return { left: lefts[i] || '50%', bottom: 'calc(14px + ' + (2 - i) + ' * (var(--dossier-h) + 28px))' };
+  }
+  const fan = [
+    { left: 'calc(50% + var(--fan-a))', bottom: '24px' },
+    { left: 'calc(50% + var(--fan-b))', bottom: '18px' },
+    { left: 'calc(50% + var(--fan-c))', bottom: '12px' }
+  ];
+  return fan[i] || fan[2];
+}
+function deskRotationPure(portrait, i) {
+  // البورتريه: ميلان واضح زي ملف ربضو بإيد موظف — الديسكتوب زي ما هو
+  const fan = [-6, 2, 5], stack = [-4.5, 3.2, -2];
+  return (portrait ? stack : fan)[i] || 0;
+}
+
+// إعادة توزيع الملفات لو الاتجاه اتقلب وهو واقف على المكتب
+let lastDeskLayout = null;
+window.addEventListener('resize', (function () {
+  let t = null;
+  return function () {
+    clearTimeout(t);
+    t = setTimeout(function () {
+      const desk = document.getElementById('screenDesk');
+      if (!desk || !desk.classList.contains('active')) return;
+      const portrait = deskIsPortrait();
+      if (portrait !== lastDeskLayout) showDeskHub();
+    }, 160);
+  };
+})());
 
 // ==================== SHOW DESK HUB ====================
 function showDeskHub() {
@@ -531,13 +629,17 @@ function showDeskHub() {
   const stack = document.getElementById('dossierStack');
   stack.innerHTML = '';
 
+  // توزيع الملفات: مروحة على الديسكتوب / رصّة عمودية على فون البورتريه (Task 25)
+  const portraitDesk = deskIsPortrait();
+  lastDeskLayout = portraitDesk;
+
   DESK_CATEGORIES.forEach((cat, i) => {
     const set = getActiveSetForCategory(cat);
     if (!set) return;
     const docState = state.docsState[set.setId] || 'empty';
     // ملف مستني أسئلته من الملفات الجاية — بيتعرض مقفول بوسم قريباً
     const isEmpty = set.questions.length === 0;
-    const rot = DOSSIER_ROTATIONS[i];
+    const rot = deskRotationPure(portraitDesk, i);
 
     const dossier = document.createElement('div');
     dossier.className = 'dossier ' + set.colorClass;
@@ -547,14 +649,10 @@ function showDeskHub() {
     dossier.id = 'dossier-' + set.setId;
     dossier.style.setProperty('--dossier-rot', rot + 'deg');
 
-    // توزيع الملفات الراقدة على الحصيرة — المسافات من متغيرات CSS حسب المقاس
-    const offsets = [
-      { left: 'calc(50% + var(--fan-a))', bottom: '24px' },
-      { left: 'calc(50% + var(--fan-b))', bottom: '18px' },
-      { left: 'calc(50% + var(--fan-c))', bottom: '12px' }
-    ];
-    dossier.style.left = offsets[i].left;
-    dossier.style.bottom = offsets[i].bottom;
+    // توزيع الملفات — بيتغير كليًا بين المروحة والرصّة حسب الاتجاه
+    const off = deskOffsetsPure(portraitDesk, i);
+    dossier.style.left = off.left;
+    dossier.style.bottom = off.bottom;
 
     // جسم الملف (الميلان والرفع للشاشة كلها CSS على العنصر ده)
     const body = document.createElement('div');
@@ -569,8 +667,8 @@ function showDeskHub() {
     const cover = document.createElement('div');
     cover.className = 'dossier-cover';
     cover.id = 'dossierCover-' + set.setId;
-    // وش الملف بقى رسمة جيبلي حقيقية (folder-a.png) — الخيط والزرار مرسومين فيها
-    cover.innerHTML = '<div class="file-serial">' + fileSerial(i) + '</div>';
+    // وش الملف: رسمة SVG حية بلون الفئة — خيط أحمر وزرار خشب وحبيبات ورق (Task 25)
+    cover.innerHTML = folderArtSVG(set.colorClass, i) + '<div class="file-serial">' + fileSerial(i) + '</div>';
 
     if (isEmpty) {
       // الوسم الأحمر — الملف فاضي لحد ما أسئلته توصل
@@ -585,7 +683,7 @@ function showDeskHub() {
       seal.id = 'waxSeal-' + set.setId;
       const sealIcon = document.createElement('span');
       sealIcon.className = 'wax-seal-icon';
-      sealIcon.textContent = '◆';
+      sealIcon.textContent = 'د'; // بصمة ديوان على الختمة (Task 26)
       seal.appendChild(sealIcon);
       cover.appendChild(seal);
     } else {
@@ -777,6 +875,13 @@ function loadDocQuestionAt(idx) {
   const badge = document.getElementById('catBadge');
   badge.textContent = q.levelLabel ? q.catLabel + ' · ' + q.levelLabel : q.catLabel;
   badge.className = 'cat-badge cat-' + q.cat;
+  // رقم الملف الرسمي — سطر الأرشيف فوق الورقة (Task 26)
+  const fileRef = document.getElementById('fileRefNum');
+  if (fileRef) {
+    const activeSet = allQuestionSets.find(s => s.setId === currentDocSetId);
+    const foldIdx = activeSet ? DESK_CATEGORIES.indexOf(activeSet.category) : 0;
+    fileRef.textContent = fileSerial(foldIdx);
+  }
   const qText = document.getElementById('questionText');
   qText.textContent = q.text;
   inkSettle(qText);
@@ -1353,22 +1458,45 @@ function viewRegisteredCertificate() {
   }
 }
 
-const avatars = ['◇','⊙','◆','∞','◎','∎','✦','⊕','☐','✎'];
+// ==================== أختام الأقسام — استمارة التوظيف (Task 26) ====================
+// 6 أختام حبرية مرسومة SVG بدل رموز اليونيكود العشرة — كل موظف بياخد ختم قسمه،
+// والاسم بيتخزن (مش الرمز) عشان يظهر مقروء في لوحة الشرف والشهادة
+const AVATAR_STAMPS = [
+  { id: 'star',     label: 'نجمة',  icon: '<path d="M32 9 L38.9 24.6 L56 26.2 L43.2 37.4 L47.1 54.2 L32 45.4 L16.9 54.2 L20.8 37.4 L8 26.2 L25.1 24.6 Z" fill="currentColor" stroke="none"/>' },
+  { id: 'crescent', label: 'هلال',  icon: '<path d="M44 12 A23 23 0 1 0 44 52 A18 18 0 1 1 44 12 Z" fill="currentColor" stroke="none"/>' },
+  { id: 'gear',     label: 'ترس',   icon: '<path d="M32 14 L35.3 21.6 L43 19 L43 27 L50.4 30 L43 33 L43 41 L35.3 38.4 L32 46 L28.7 38.4 L21 41 L21 33 L13.6 30 L21 27 L21 19 L28.7 21.6 Z" fill="currentColor" stroke="none"/><circle cx="32" cy="30" r="4.4" stroke-width="2.6"/>' },
+  { id: 'scales',   label: 'ميزان', icon: '<path d="M32 12 V45 M23 46 H41 M13 23 H51" stroke-width="2.6"/><path d="M13 23 L7.5 35 M13 23 L18.5 35 M7.5 35 A5.8 5.8 0 0 0 18.5 35 M51 23 L45.5 35 M51 23 L56.5 35 M45.5 35 A5.8 5.8 0 0 0 56.5 35" stroke-width="2.2"/>' },
+  { id: 'key',      label: 'مفتاح', icon: '<circle cx="22.5" cy="24.5" r="8.5" stroke-width="3"/><path d="M28.8 30.8 L50 52 M42.5 44.5 L48.5 38.5 M46.5 50.5 L52.5 44.5" stroke-width="3"/>' },
+  { id: 'quill',    label: 'ريشة',  icon: '<path d="M47 10.5 C36 15.5 25 28 20 45 C30.5 40 43 27 47 10.5 Z" fill="currentColor" stroke="none"/><path d="M22 42 L13 53" stroke-width="2.8"/>' }
+];
+
+// حلقة ختم مكسورة مرتين — إحساس الطبع الحقيقي بدل الدوايرة الهندسية المثالية
+function stampSVG(icon) {
+  return '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + '<g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">'
+    + '<circle cx="32" cy="32" r="27" stroke-width="2.5" stroke-dasharray="92 10 58 8"/>'
+    + '<circle cx="32" cy="32" r="22.5" stroke-width="1.3" opacity=".5"/>'
+    + icon
+    + '</g></svg>';
+}
+
 const avatarGrid = document.getElementById('avatarGrid');
-avatars.forEach((emoji, i) => {
+AVATAR_STAMPS.forEach((stamp, i) => {
   const btn = document.createElement('button');
   btn.className = 'avatar-stamp';
-  btn.textContent = emoji;
-  btn.onclick = () => selectAvatar(i, emoji);
+  btn.title = 'ختم ' + stamp.label;
+  btn.setAttribute('aria-label', 'ختم ' + stamp.label);
+  btn.innerHTML = stampSVG(stamp.icon);
+  btn.onclick = () => selectAvatar(i, stamp.label);
   avatarGrid.appendChild(btn);
 });
 
-function selectAvatar(index, emoji) {
+function selectAvatar(index, label) {
   Sound.penTap();
   document.querySelectorAll('.avatar-stamp').forEach((b, i) => {
     b.classList.toggle('selected', i === index);
   });
-  state.playerAvatar = emoji;
+  state.playerAvatar = label;
   checkEntryForm();
 }
 
@@ -1533,11 +1661,20 @@ function formatTimeLeft(t) {
 }
 
 function createOptionButtons(gridEl, options, clickHandler) {
+  // حروف رسمية زي ورقة الامتحان — أ/ب/ج/د في خانة مختومة جنب كل اختيار (Task 26)
+  const LETTERS_AR = ['أ', 'ب', 'ج', 'د', 'هـ'];
   gridEl.innerHTML = '';
   options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
-    btn.textContent = opt;
+    const letter = document.createElement('span');
+    letter.className = 'opt-letter';
+    letter.textContent = LETTERS_AR[i] || String(i + 1);
+    const txt = document.createElement('span');
+    txt.className = 'opt-text';
+    txt.textContent = opt;
+    btn.appendChild(letter);
+    btn.appendChild(txt);
     btn.onclick = () => clickHandler(i);
     inkSettle(btn);
     gridEl.appendChild(btn);
@@ -1587,6 +1724,12 @@ function updateCandleVisual() {
   if (!timeEl) return;
   timeEl.classList.remove('zone-fast', 'zone-mid', 'zone-slow');
   timeEl.classList.add(timeZoneClass(pct));
+  // شريط الحبر — بينسحب مع الوقت ويتحول أحمر ويقعد ينبض في التلت الأخير (Task 26)
+  const inkFill = document.getElementById('inkFill');
+  if (inkFill) {
+    inkFill.style.width = (pct * 100).toFixed(1) + '%';
+    inkFill.classList.toggle('ink-urgent', pct <= 0.33);
+  }
 }
 
 function handleTimeout() {
