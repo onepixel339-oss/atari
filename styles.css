@@ -563,6 +563,15 @@ body::before {
   color: var(--diwan-paper);
   border-color: var(--diwan-desk-dark);
 }
+/* الملف السرّي الغامق: نسيج الورق الجيبلي بيتغمق بالكرافت بدل ما يغطيه بورق فاتح
+   (بدون كده النص الفاتح بيقع على ورق كريمي = كلام مختفي) */
+.bonus-intro.bonus-intro-bg {
+  background-image: url('img/paper-ghibli.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-blend-mode: multiply;
+}
 .secret-stamp {
   position: absolute;
   top: 20px;
