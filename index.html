@@ -45,6 +45,15 @@
 
     <button class="submit-btn" id="submitBtn" disabled onclick="startGame()">ادخل الديوان</button>
 
+    <!-- كارت الموظف المتسجل: الدخلة مرة واحدة لكل جولة -->
+    <div class="entry-locked" id="entryLocked" style="display:none;">
+      <div class="entry-locked-stamp">مُسجّل</div>
+      <div class="entry-locked-title">سجلك في الديوان خلاص</div>
+      <div class="entry-locked-name" id="entryLockedName"></div>
+      <div class="entry-locked-sub">الدخلة مرة واحدة لكل موظف في الجولة — دي قاعدة الديوان. استنى جولة الأسئلة الجديدة لو حابب تكرر.</div>
+      <button class="entry-locked-btn" onclick="viewRegisteredCertificate()">شوف شهادتك</button>
+    </div>
+
     <button class="hall-toggle-btn" id="hallToggleBtn" onclick="toggleHall()" aria-label="فتح لوحة الشرف">🏆 لوحة الشرف</button>
 
     <div class="hall-panel" id="hallPanel" style="display:none;">
@@ -172,7 +181,8 @@
 <!-- ==================== SCREEN 2: GAMEPLAY ==================== -->
 <div class="screen world" id="screenGame">
   <div class="game-container">
-    <button class="desk-back-btn" onclick="exitDocToDesk()">◄ المكتب</button>
+    <!-- قاعدة الديوان: مفيش رجوع من الملف — الزرار اتشال نهائيًا (Task 24) -->
+    <div class="commit-tag" aria-hidden="true">مفيش رجوع — الملف اللي بيفتح لازم يخلص</div>
     <!-- Top bar -->
     <div class="top-bar">
       <div class="streak-box">
@@ -370,6 +380,21 @@
     </div>
     <div class="explain-list" id="explainList"></div>
     <button class="explain-close-btn" id="explainCloseBtn" onclick="closeExplainReview()">يلا نكمّل ←</button>
+  </div>
+</div>
+
+<!-- بوابة قلب الموبايل — اللعبة طولي على الفون (Task 24)
+     بتظهر بس على الجهاز اللمسي في الوضع العرضي، وبتختفي أول ما تقلب -->
+<div class="rotate-gate" id="rotateGate" aria-hidden="true">
+  <div class="rotate-gate-inner">
+    <svg class="rotate-gate-phone" viewBox="0 0 64 96" xmlns="http://www.w3.org/2000/svg">
+      <rect x="6" y="4" width="52" height="88" rx="10" fill="none" stroke="currentColor" stroke-width="4"/>
+      <line x1="26" y1="14" x2="38" y2="14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="32" cy="82" r="3.5" fill="currentColor"/>
+    </svg>
+    <div class="rotate-gate-title">اقلب موبايلك</div>
+    <div class="rotate-gate-sub">الديوان بيتقدم بالوضع الطولي 📱<br>قلب الموبايل وكمّل ملفاتك</div>
+    <div class="rotate-gate-stamp">قاعدة الديوان</div>
   </div>
 </div>
 

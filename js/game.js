@@ -92,6 +92,12 @@ const state = {
 
 // ==================== LOCALSTORAGE PERSISTENCE ====================
 const STORAGE_KEY = 'diwanGameState';
+// مفتاح خفيف منفصل: لحظة المؤقت الحالية (بتتكتب كل ثانية) — عشان تجميد واستكمال الوقت
+// لو اللاعب خرج من الملف أو عمل ريفريش، بيرجع يلاقي نفس الثواني المتبقية مش وقت كامل من الأول
+const DOC_TIME_KEY = 'diwanDocTime';
+// سجل الموظفين: كل موظف ليه دخلة واحدة في الجولة (بيتسجل أول ما الشهادة تتعرض)
+// بيتصفّر مع الجولة الجديدة (حراسة الموسم) — يعني كل جولة أسئلة جديدة = فرصة جديدة
+const REG_KEY = 'diwanRegisteredName';
 
 const SAVEABLE_KEYS = [
   'playerName','playerAvatar','playerPhoto','playerSignature',
@@ -130,6 +136,97 @@ function loadState() {
 
 function clearSavedState() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(DOC_TIME_KEY);
+}
+
+// نقية للاختبارات: توحيد الاسم — مسافات زايدة ومسافات مكررة بتتشال عشان "أحمد " = "أحمد"
+function normalizeNamePure(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ');
+}
+
+// نقية للاختبارات: ثواني الاستكمال — المتبقي المحفوظ مش بيتعدّى وقت السؤال الأصلي
+// (لو اتسجل وقت بعد استئناف والاستئناف اتلغى، القفعة بتحمي من وقت زيادة)
+function resumeSecondsPure(savedT, questionTime, appealBonus) {
+  const s = Number(savedT);
+  if (!isFinite(s) || s <= 0) return questionTime;
+  return Math.min(s, questionTime + (appealBonus || 0));
+}
+
+// كتابة/مسح لحظة المؤقت — بيتكتب كل ثانية والمؤقت شغال، وبيمسح أول ما السؤال يخلص
+function saveDocTimeSnapshot() {
+  try {
+    if (!currentDocSetId || !currentDocQuestions.length) return;
+    localStorage.setItem(DOC_TIME_KEY, JSON.stringify({
+      setId: currentDocSetId,
+      idx: currentDocQuestionIdx,
+      t: timeLeft,
+      appeal: !!state.appealUsed
+    }));
+  } catch (e) {}
+}
+
+function clearDocTimeSnapshot() {
+  try { localStorage.removeItem(DOC_TIME_KEY); } catch (e) {}
+}
+
+// استرجاع لحظة المؤقت لو الملف اتفتح تاني على نفس السؤال — جوهر قاعدة تجميد واستكمال
+function applyDocTimeSnapshot() {
+  try {
+    const raw = localStorage.getItem(DOC_TIME_KEY);
+    if (!raw) return false;
+    const snap = parseDocSnapshotPure(raw);
+    if (!snap || snap.setId !== currentDocSetId || snap.idx !== currentDocQuestionIdx) return false;
+    const cap = resumeSecondsPure(snap.t, questionTimeLimit(), snap.appeal ? APPEAL_BONUS_TIME : 0);
+    timeLeft = cap;
+    state.appealUsed = !!snap.appeal;
+    clearDocTimeSnapshot();
+    return true;
+  } catch (e) { return false; }
+}
+
+// نقية للاختبارات: قراءة لحظة المؤقت المخزنة — بترجع لقطة سليمة بس أو null
+// (JSON بايظ / حقول ناقصة / ثواني فاسدة = مفيش استكمال — ده بيحمي من أي تلاعب بالتخزين)
+function parseDocSnapshotPure(raw) {
+  try {
+    const snap = JSON.parse(raw);
+    if (!snap || typeof snap !== 'object') return null;
+    if (typeof snap.setId !== 'string' || !snap.setId) return null;
+    const idx = Number(snap.idx);
+    if (!isFinite(idx) || idx < 0) return null;
+    const t = Number(snap.t);
+    if (!isFinite(t) || t <= 0) return null;
+    return { setId: snap.setId, idx: Math.floor(idx), t: t, appeal: !!snap.appeal };
+  } catch (e) { return null; }
+}
+
+// نقية للاختبارات: فهرس استكمال آمن داخل الملف — بره الحدود = مفيش استكمال (-1)
+function resumeIdxPure(idx, len) {
+  const i = Math.floor(Number(idx));
+  if (!isFinite(i) || i < 0) return -1;
+  if (!isFinite(len) || len <= 0) return -1;
+  if (i >= len) return -1; // اللقطة بتصفّر أول ما الملف يخلص — فهرس بره الحدود = لقطة قديمة فاسدة
+  return i;
+}
+
+function getDocTimeSnapshot() {
+  try { return parseDocSnapshotPure(localStorage.getItem(DOC_TIME_KEY)); } catch (e) { return null; }
+}
+
+// قاعدة الدخلة الواحدة (Task 24): لو التاب اتقفل وسط سؤال — الرجوع بيفتح نفس السؤال
+// لوحده من غير لمسة، والمؤقت بيكمل من نفس الثانية (اتجمّد وهو غايب). يعني مفيش
+// أي طريق ترجع بيها للمكتب من جوه الملف قبل ما تجاوب.
+function resumeDocFromSnapshot() {
+  const snap = getDocTimeSnapshot();
+  if (!snap) return false;
+  const set = allQuestionSets.find(s => s.setId === snap.setId);
+  if (!set || !set.questions.length) return false;
+  const idx = resumeIdxPure(snap.idx, set.questions.length);
+  if (idx < 0) { clearDocTimeSnapshot(); return false; }
+  state.activeSetId = snap.setId;
+  state.docsState[snap.setId] = 'inProgress';
+  switchScreen('screenEntry', 'screenGame');
+  loadDocQuestion(snap.setId, idx);
+  return true;
 }
 
 // ==================== QUESTIONS (مستخرجة من data/questions.js) ====================
@@ -327,6 +424,13 @@ function switchScreen(from, to) {
   const toEl = document.getElementById(to);
   fromEl.classList.add('fade-out');
   setTimeout(() => {
+    // قاعدة أمان: شاشة واحدة فعالة في نفس اللحظة — أي شاشة تانية لسه فعالة
+    // بتتقفل كمان (كان بيحصل تعارض لما from مش هي فعلاً الشاشة المفتوحة،
+    // زي "شوف شهادتك" بعد الاستعادة: المكتب فضل فعال جنب الشهادة)
+    document.querySelectorAll('.screen.active').forEach(el => {
+      el.classList.remove('active', 'fade-out');
+      el.style.display = 'none';
+    });
     fromEl.classList.remove('active', 'fade-out');
     fromEl.style.display = 'none';
     toEl.style.display = '';
@@ -639,6 +743,9 @@ function loadDocQuestion(setId, startIdx) {
   currentDocSetId = setId;
   // Resume correct count from saved state (not zero)
   docCorrectCount = state.docCorrectCounts[setId] || 0;
+  // فتح الملف من الأول (مش استكمال سؤال جاري) = مفيش وقت متجمّع يتطبق بالغلط
+  // applyDocTimeSnapshot بتتحقق بنفسها من تطابق السؤال، وده طبقة أمان زيادة
+  state.appealUsed = false;
   loadDocQuestionAt(startIdx);
 }
 
@@ -659,7 +766,7 @@ function loadDocQuestionAt(idx) {
   const q = currentDocQuestions[idx];
   questionStartTime = Date.now();
   answerPickedAt = 0;
-  state.appealUsed = false;
+  state.appealUsed = false; // كل سؤال بيبدأ من غير استئناف — واسترجاع لحظة المؤقت (تحت في startTimer) ممكن يرجّعه لو الاستئناف اتعمل قبل الخروج
 
   const card = document.getElementById('questionCard');
   card.classList.remove('card-slide-in', 'card-slide-out');
@@ -781,6 +888,7 @@ function resolveDocAnswer(index, withMultiplier) {
 }
 
 function finishDocAnswer(isCorrect, points, tag) {
+  clearDocTimeSnapshot(); // السؤال خلص — مفيش وقت متجمّع يحتاج استكمال
   const answerTime = (Date.now() - questionStartTime) / 1000;
   state.answerTimes.push(answerTime);
   const q = currentDocQuestions[currentDocQuestionIdx];
@@ -824,6 +932,7 @@ function finishDocAnswer(isCorrect, points, tag) {
 // ==================== FINISH DOCUMENT (shows achievement card) ====================
 function finishDocument(setId) {
   clearInterval(timerInterval);
+  clearDocTimeSnapshot(); // الملف خلص خلاص
   state.docsState[setId] = 'done';
   
   // Calculate per-document stats
@@ -883,13 +992,9 @@ function returnToDesk() {
   setTimeout(() => showDeskHub(), 400);
 }
 
-function exitDocToDesk() {
-  if (!state.activeSetId) return;
-  state.docProgress[state.activeSetId] = currentDocQuestionIdx;
-  state.docsState[state.activeSetId] = 'inProgress';
-  saveState();
-  returnToDesk();
-}
+// ⚠️ exitDocToDesk اتشالت في Task 24 — قاعدة الدخلة الواحدة: مفيش رجوع للمكتب
+// من جوه الملف. الزرار اتشال من HTML والدالة معاها، والاستكمال الوحيد المسموح
+// هو resumeDocFromSnapshot (تاب اتقفل بالغلط → نفس السؤال يفتح لوحده).
 
 // ==================== ACHIEVEMENT CARD (Prompt 4) ====================
 // ملف الاجابات التفصيلية اللي مستنية تتعرض بعد قفل كارت الإنجاز (بعد ما الملف يخلص)
@@ -1197,11 +1302,57 @@ function closeCardReview() {
 
 // الصفحة اللي بعد الإجابة — بتتقدّم للسؤال اللي بعده بعد مهلة عرض 1.5 ثانية
 function advanceToNextQuestion() {
+  // التقدم بيتثبت فورًا لحظة الإجابة مش بعد مهلة العرض — لو التاب اتقفل في النص
+  // السؤال اللي خلص مش هيتكرر (دخلة واحدة لكل سؤال — Task 24)
+  if (currentDocSetId) {
+    state.docProgress[currentDocSetId] = currentDocQuestionIdx + 1;
+    saveState();
+  }
   setTimeout(() => advanceCard('questionCard', () => loadDocQuestionAt(currentDocQuestionIdx + 1)), 1500);
 }
 
 
 // ==================== ENTRY SCREEN ====================
+// سجل الموظفين: الدخلة مرة واحدة في الجولة — بيتسجل أول ما الشهادة تتعرض
+// (عند اكتمال الجولة مش عند البداية — عشان لو حد قفل الصفحة بالغلط مايتقفلش بره للأبد)
+function getRegisteredName() {
+  try { return normalizeNamePure(localStorage.getItem(REG_KEY) || ''); } catch (e) { return ''; }
+}
+
+function registerEmployeeOnce(name) {
+  const n = normalizeNamePure(name);
+  if (!n) return;
+  try { localStorage.setItem(REG_KEY, n); } catch (e) {}
+}
+
+// شاشة الدخول في وضع "مُسجّل": الفورم بيتخفى وكارت القيد بيبان
+function showEntryLocked() {
+  const reg = getRegisteredName();
+  const locked = document.getElementById('entryLocked');
+  if (!locked) return;
+  document.getElementById('entryLockedName').textContent = reg || '';
+  locked.style.display = 'block';
+  ['photoSlot','nameInput'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  ['.name-input-wrap','.avatar-grid','.sig-wrap'].forEach(sel => {
+    const el = document.querySelector(sel); if (el) el.style.display = 'none';
+  });
+  const submit = document.getElementById('submitBtn');
+  if (submit) submit.style.display = 'none';
+  const glow = document.getElementById('formGlow');
+  if (glow) glow.style.display = 'none';
+}
+
+// الموظف المتسجل يقدر يفتح شهادته ويستعرض جولته — من غير دخلة جديدة
+function viewRegisteredCertificate() {
+  Sound.penTap();
+  const ok = loadState();
+  if (ok && state.playerName) {
+    state.totalScore = state.mainScore + state.bonusScore;
+    switchScreen('screenEntry', 'screenCert');
+    setTimeout(() => renderCertificate(), 400);
+  }
+}
+
 const avatars = ['◇','⊙','◆','∞','◎','∎','✦','⊕','☐','✎'];
 const avatarGrid = document.getElementById('avatarGrid');
 avatars.forEach((emoji, i) => {
@@ -1344,7 +1495,9 @@ document.getElementById('photoInput').addEventListener('change', function(e) {
 });
 
 function startGame() {
-  state.playerName = document.getElementById('nameInput').value.trim();
+  // قاعدة الديوان: الموظف له دخلة واحدة في الجولة — المتسجل بيتردّ فوراً
+  if (getRegisteredName()) { showEntryLocked(); return; }
+  state.playerName = normalizeNamePure(document.getElementById('nameInput').value.trim());
   state.hasWasta = true; // واسطة جديدة مع كل دخول ديوان
   // تشغيل أجواء المكتب المحيطة (النقرة نفسها تفكّ قفل الصوت في المتصفح)
   if (window.Ambience) Ambience.unlock();
@@ -1396,6 +1549,9 @@ function startTimer() {
   // كل سؤال ليه وقته الخاص — الشمعة بتتولّد من وقت السؤال نفسه
   currentQuestionTime = questionTimeLimit();
   timeLeft = currentQuestionTime;
+  // تجميد واستكمال: لو خرجنا من الملف (أو الريفريش حصل) وسط السؤال ده — بنكمل بالثواني المتبقية
+  // ده بيقفل غش الخروج والدخول اللي كان بيجدد الوقت من الأول
+  applyDocTimeSnapshot();
   updateTimerDisplay();
   updateCandleVisual();
 
@@ -1403,9 +1559,11 @@ function startTimer() {
     timeLeft--;
     updateTimerDisplay();
     updateCandleVisual();
+    saveDocTimeSnapshot(); // لحظة مؤقتة كل ثانية — الريفريش أو الخروج مش بيصفّرش الوقت
     if (timeLeft <= 3 && timeLeft > 0) Sound.tick();
     if (timeLeft <= 0) {
       clearInterval(timerInterval);
+      clearDocTimeSnapshot();
       handleTimeout();
     }
   }, 1000);
@@ -1980,6 +2138,10 @@ function renderCertificate() {
       hallLine.textContent = '🏆 اللوحة مليانة أشطر من كده… ورّقها المرة الجاية!';
     }
   }
+
+  // 3.6 قيد في سجل الموظفين — لحظة الشهادة = الجولة اكتملت = الدخلة اتحسبت
+  // من هنا شاشة الدخول بتقفل للاسم ده لحد ما جولة أسئلة جديدة تبدأ
+  registerEmployeeOnce(state.playerName);
   
   // 4. Circular stamp with Arabic text (enhance cert-stamp)
   enhanceCertStamp(stampEl);
@@ -2655,20 +2817,22 @@ function saveHallStorage(list) {
 }
 
 // نقية للاختبارات: دمج نتيجة — نفس الاسم يحتفظ بأحسن نتيجة — وترجع اللوحة المرتبة والمركز
+// المقارنة بأسماء موحّدة (مسافات متعادلة) عشان "أحمد " و "أحمد" ميبقوش شخصين
 function upsertHallPure(list, entry, max) {
-  const old = list.find(e => e.name === entry.name);
+  const en = normalizeNamePure(entry.name);
+  const old = list.find(e => normalizeNamePure(e.name) === en);
   const best = old && old.score >= entry.score ? old : entry;
-  const next = list.filter(e => e.name !== entry.name);
+  const next = list.filter(e => normalizeNamePure(e.name) !== en);
   next.push(best);
   next.sort((a, b) => (b.score - a.score) || ((b.pct || 0) - (a.pct || 0)));
   const trimmed = next.slice(0, max);
-  const rank = trimmed.findIndex(e => e.name === entry.name) + 1;
+  const rank = trimmed.findIndex(e => normalizeNamePure(e.name) === en) + 1;
   return { list: trimmed, rank: rank, isBest: best === entry };
 }
 
 function recordInHall(score, pct, tierText) {
   const entry = {
-    name: state.playerName || 'موظف مجهول',
+    name: normalizeNamePure(state.playerName) || 'موظف مجهول',
     avatar: state.playerAvatar || '◆',
     score: score,
     pct: pct,
@@ -2722,8 +2886,9 @@ function renderHall() {
     return;
   }
   const medals = ['🥇', '🥈', '🥉'];
+  const meNorm = normalizeNamePure(state.playerName);
   rows.innerHTML = list.map((e, i) => {
-    const me = e.name === state.playerName ? ' hall-me' : '';
+    const me = normalizeNamePure(e.name) === meNorm ? ' hall-me' : '';
     const rank = medals[i] || ((i + 1) + '-');
     return '<div class="hall-row' + (i < 3 ? ' hall-top' : '') + me + '">'
       + '<span class="hall-rank">' + rank + '</span>'
@@ -2800,6 +2965,7 @@ function useAppeal() {
   timeLeft += APPEAL_BONUS_TIME;
   updateTimerDisplay();
   updateCandleVisual();
+  saveDocTimeSnapshot(); // الثواني الممتدة تتسجل — الاستكمال ياخد بالحق
 
   // Hide the appeal button
   document.getElementById('appealBtn').style.display = 'none';
@@ -2871,6 +3037,8 @@ function computeSeasonHash() {
   localStorage.setItem(SEASON_KEY, cur);
   localStorage.removeItem(HALL_KEY);    // لوحة الشرف — صافية للجولة الجديدة
   localStorage.removeItem(STORAGE_KEY); // الحفظ القديم — الملفات ترجع فاضية
+  localStorage.removeItem(REG_KEY);     // سجل الموظفين بيتصفّر برضه — كل جولة = دخلة جديدة للكل
+  clearDocTimeSnapshot();               // أي وقت متجمّع من الجولة القديمة مالوش لازمة
   seasonJustReset = true;
 })();
 
@@ -2891,7 +3059,27 @@ function showSeasonNote() {
 
 // ==================== RESTORE SAVED STATE ON LOAD ====================
 (function restoreOnLoad() {
+  const reg = getRegisteredName();
   const hasSaved = localStorage.getItem(STORAGE_KEY);
+
+  // موظف متسجل؟ الدخلة اتستهلكت — بيرجع للمكتب على طول من غير سؤال الاستكمال
+  if (reg) {
+    showEntryLocked();
+    if (hasSaved) {
+      loadState();
+      applyMuteIcon();
+      if (state.playerName) {
+        state.activeSetId = null;
+        state.appealUsed = false;
+        // الدخلة الواحدة: لو التاب اتقفل وسط سؤال — نفس السؤال بيفتح لوحده (Task 24)
+        if (resumeDocFromSnapshot()) return;
+        switchScreen('screenEntry', 'screenDesk');
+        setTimeout(() => showDeskHub(), 200);
+      }
+    }
+    return;
+  }
+
   if (!hasSaved) return;
   if (!confirm('هل تريد استمرار اللعب من حيث توقفت؟')) {
     clearSavedState();
@@ -2904,6 +3092,8 @@ function showSeasonNote() {
   if (state.playerName) {
     state.activeSetId = null;
     state.appealUsed = false;
+    // نفس القاعدة للموظف اللي لسه مسجلش: السؤال الشغال بيرجع يفتح لوحده
+    if (resumeDocFromSnapshot()) return;
     switchScreen('screenEntry', 'screenDesk');
     setTimeout(() => showDeskHub(), 200);
   }
