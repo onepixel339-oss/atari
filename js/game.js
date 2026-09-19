@@ -3012,6 +3012,7 @@ function drawCertificateCanvas() {
     const rejectedStamp = stampClass.indexOf('stamp-rejected') > -1;
     const badges = Array.prototype.map.call(document.querySelectorAll('#badgesRow .badge'), function (b) { return b.textContent.trim(); });
     const refText = textOf('certRefNumber');
+    const recordText = textOf('certRecordLine'); // سطر الريكورد المحلي — كان ناقص من الصورة المنزّلة (Task 37)
     const damghaNum = textOf('certDamgha');
     const encSec = document.getElementById('enclosuresSection');
     const encCount = document.querySelectorAll('#enclosuresRow > *').length;
@@ -3230,11 +3231,16 @@ function drawCertificateCanvas() {
           y += 36;
         }
 
-        // 9) الرقم المرجعي
+        // 9) الرقم المرجعي + سطر الريكورد المحلي — الاتنين زي الورقة بالظبط (Task 37)
         if (refText) {
           ctx.fillStyle = 'rgba(154,163,208,.55)';
           ctx.font = '500 19px ' + BODY;
-          ctx.fillText(refText, CX, H - 52);
+          ctx.fillText(refText, CX, H - 60);
+        }
+        if (recordText) {
+          ctx.fillStyle = AMBER;
+          ctx.font = '700 16px ' + BODY;
+          ctx.fillText(recordText, CX, H - 34);
         }
 
         resolve(canvas);
