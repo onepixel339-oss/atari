@@ -3,356 +3,127 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>الديوان</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23f2e4c8'/%3E%3Ccircle cx='32' cy='32' r='22' fill='%23a3332e'/%3E%3Ctext x='32' y='41' font-size='24' text-anchor='middle' fill='%23f2e4c8' font-family='serif'%3E%D8%AF%3C/text%3E%3C/svg%3E">
+<meta name="description" content="سلطان الأتاري — أقوى مسابقة أسئلة بالعامية المصرية: 3 مراحل + جولة مخاطرة وكأس للبطول">
+<title>سلطان الأتاري</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230B0B18'/%3E%3Crect x='12' y='8' width='40' height='10' fill='%23FFE600'/%3E%3Crect x='16' y='18' width='32' height='8' fill='%23FFE600'/%3E%3Crect x='20' y='26' width='24' height='8' fill='%23FFE600'/%3E%3Crect x='26' y='34' width='12' height='8' fill='%23FFE600'/%3E%3Crect x='18' y='42' width='28' height='8' fill='%23FF2E88'/%3E%3Crect x='12' y='50' width='40' height='6' fill='%2300E5FF'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhaijaan+2:wght@500;600;700;800&family=Cairo:wght@400;600;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- Mute Button -->
+<!-- سكان-لاينز الشاشة القديمة — طبقة زخرفة بلا تفاعل (Task 28) -->
+<div class="crt-lines" aria-hidden="true"></div>
+
+<!-- زرار الكتم -->
 <button class="mute-btn" id="muteBtn" onclick="toggleMute()" aria-label="كتم الصوت">🔊</button>
 
-<!-- Hidden file input for photo upload -->
+<!-- Input الصورة المخفي -->
 <input type="file" id="photoInput" accept="image/*" style="display:none">
 
-<!-- ==================== SCREEN 1: ENTRY — استمارة توظيف رسمية (Task 26) ==================== -->
-<div class="screen active world" id="screenEntry">
-  <div class="entry-paper paper-texture" id="entryPaper" style="position:relative;">
-    <div class="form-glow" id="formGlow"></div>
+<!-- ==================== شاشة ١: شاشة البداية — بطاقة اللاعب (Task 28) ==================== -->
+<div class="screen active" id="screenEntry">
+  <div class="entry-wrap">
 
-    <div class="form-head">
-      <div class="form-formnum">نموذج ٦٢ — شعبة الشهادات</div>
-      <div class="entry-title">الديوان</div>
-      <div class="entry-subtitle">استمارة تسجيل موظف جديد</div>
-    </div>
-    <div class="form-rule" aria-hidden="true"><i></i><i></i></div>
+    <header class="cover-head">
+      <div class="issue-box">INSERT COIN — جولة ٢٠٢٦</div>
+      <div class="cover-logo">
+        <div class="cover-burst" aria-hidden="true"></div>
+        <div class="cover-title">سلطان الأتاري</div>
+      </div>
+      <div class="cover-sub">أقوى مسابقة أسئلة بالعامية — جرّب حظك يا بطل</div>
+    </header>
 
-    <div class="form-grid-top">
-      <div class="photo-slot" id="photoSlot" onclick="document.getElementById('photoInput').click()">
-        <span class="placeholder" id="photoPlaceholder">صورة</span>
-      </div>
-      <div class="name-input-wrap">
-        <label class="form-label" for="nameInput">اسم الموظف</label>
-        <input type="text" class="name-input" id="nameInput" placeholder="بخط اليد هنا..." maxlength="20" autocomplete="off">
-        <div class="form-hintline">البيانات للديوان بس — والشاي علينا</div>
-      </div>
+    <!-- شاشة الجذب — الريكورد المحلي بستايل ATTRACT MODE (Task 29 → 33) -->
+    <div class="attract-box" id="attractBox" aria-hidden="true">
+      <div class="attract-title">★ HIGH SCORE ★</div>
+      <div class="attract-rows" id="attractRows"></div>
     </div>
 
-    <div class="form-label stamps-label">ختم القسم — دوس على الختم اللي يناسبك</div>
-    <div class="avatar-grid" id="avatarGrid"></div>
+    <div class="entry-form" id="entryPaper">
+      <div class="form-grid-top">
+        <div class="photo-slot" id="photoSlot" onclick="document.getElementById('photoInput').click()">
+          <span class="placeholder" id="photoPlaceholder">صورة</span>
+        </div>
+        <div class="name-input-wrap">
+          <label class="form-label" for="nameInput">اسم اللاعب</label>
+          <input type="text" class="name-input" id="nameInput" placeholder="اكتب اسمك يا نجم..." maxlength="20" autocomplete="off">
+          <div class="form-hintline">اسمك بس هو اللي بينطبع على الكأس — يلا!</div>
+        </div>
+      </div>
 
-    <div class="sig-wrap">
-      <div class="sig-label">
-        <span>توقيع الموظف (اختياري)</span>
-        <button class="sig-clear-btn" id="sigClearBtn" onclick="clearSignature()">امسح</button>
+      <div class="form-rule" aria-hidden="true"><i></i><i></i></div>
+
+      <div class="form-label stamps-label">اختار شخصيتك — دوس على الأيقونة اللي تعجبك</div>
+      <div class="avatar-grid" id="avatarGrid"></div>
+
+      <div class="sig-wrap">
+        <div class="sig-label">
+          <span>توقيع اللاعب (اختياري)</span>
+          <button class="sig-clear-btn" id="sigClearBtn" onclick="clearSignature()">امسح</button>
+        </div>
+        <div class="sig-frame">
+          <canvas class="sig-canvas" id="sigCanvas" width="560" height="200"></canvas>
+          <div class="sig-hint">وقّع يا معلم</div>
+        </div>
       </div>
-      <div class="sig-frame">
-        <canvas class="sig-canvas" id="sigCanvas" width="560" height="200"></canvas>
-        <div class="sig-hint">وقع هنا</div>
-      </div>
+
+      <div class="form-glow" id="formGlow" aria-hidden="true">جاهز!</div>
+      <button class="submit-btn" id="submitBtn" disabled onclick="startGame()">يلا نلعب! ▶</button>
     </div>
 
-    <button class="submit-btn" id="submitBtn" disabled onclick="startGame()">ادخل الديوان</button>
-
-    <!-- كارت الموظف المتسجل: الدخلة مرة واحدة لكل جولة -->
+    <!-- كارت اللاعب المتسجل: الدخلة مرة واحدة لكل جولة -->
     <div class="entry-locked" id="entryLocked" style="display:none;">
-      <div class="entry-locked-stamp">مُسجّل</div>
-      <div class="entry-locked-title">سجلك في الديوان خلاص</div>
+      <div class="entry-locked-stamp">اتسجّلت</div>
+      <div class="entry-locked-title">إنت داخل خلاص يا بطل</div>
       <div class="entry-locked-name" id="entryLockedName"></div>
-      <div class="entry-locked-sub">الدخلة مرة واحدة لكل موظف في الجولة — دي قاعدة الديوان. استنى جولة الأسئلة الجديدة لو حابب تكرر.</div>
-      <button class="entry-locked-btn" onclick="viewRegisteredCertificate()">شوف شهادتك</button>
-    </div>
-
-    <button class="hall-toggle-btn" id="hallToggleBtn" onclick="toggleHall()" aria-label="فتح لوحة الشرف">🏆 لوحة الشرف</button>
-
-    <div class="hall-panel" id="hallPanel" style="display:none;">
-      <div class="hall-title">🏆 لوحة الشرف</div>
-      <div class="hall-sub">أشطر موظفين الديوان — أعلى النقط</div>
-      <div class="hall-rows" id="hallRows"></div>
-      <div class="hall-foot">نتيجتك بتتسجل في اللوحة أول ما توصل لشهادة التقدير</div>
+      <div class="entry-locked-sub">الدخلة مرة واحدة لكل لاعب في الجولة — دي قاعدة الأتاري. استنى جولة الأسئلة الجديدة لو حابب تكرر.</div>
+      <button class="entry-locked-btn" onclick="viewRegisteredCertificate()">شوف كأسك</button>
     </div>
   </div>
 </div>
 
-
-<!-- ==================== SCREEN: DESK HUB (Prompt 1) ==================== -->
+<!-- ==================== شاشة ٢: الصالة — جريد كروت المراحل (Task 28) ==================== -->
 <div class="screen" id="screenDesk">
-  <div class="desk-surface">
-    <!-- لوحة خشب مرسومة معلقة على الحيطة — العنوان بقى جزء من الرسمة (Task 25) -->
+  <div class="desk-wrap">
     <div class="desk-sign">
-      <svg viewBox="0 0 320 96" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="signWood" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#A2743F"/>
-            <stop offset=".5" stop-color="#8A5F33"/>
-            <stop offset="1" stop-color="#6E4A26"/>
-          </linearGradient>
-        </defs>
-        <!-- سلكين معلقين من فوق -->
-        <path d="M28,14 L28,2 M292,14 L292,2" stroke="#4E3A22" stroke-width="3" fill="none"/>
-        <!-- اللوح الخشب -->
-        <rect x="10" y="14" width="300" height="70" rx="10" fill="url(#signWood)" stroke="#54371B" stroke-width="3"/>
-        <!-- عروق الخشب المرسومة بإيد -->
-        <path d="M20,32 Q160,26 300,33 M18,48 Q120,44 208,49 Q260,51 302,47 M22,66 Q150,71 298,64" stroke="rgba(56,34,12,.35)" stroke-width="2" fill="none"/>
-        <path d="M14,22 Q160,17 306,22" stroke="rgba(255,236,200,.28)" stroke-width="2" fill="none"/>
-        <!-- مسامير النحاس -->
-        <circle cx="26" cy="26" r="3.4" fill="#3E2A14"/><circle cx="294" cy="26" r="3.4" fill="#3E2A14"/>
-        <circle cx="26" cy="72" r="3.4" fill="#3E2A14"/><circle cx="294" cy="72" r="3.4" fill="#3E2A14"/>
-      </svg>
-      <div class="desk-title">المكتب</div>
+      <div class="desk-kicker">سلطان الأتاري · الصالة الرئيسية</div>
+      <div class="desk-title">الصالة</div>
     </div>
-    <div class="desk-subtitle" id="deskSubtitle">اختر ملف للبدء</div>
+    <div class="desk-subtitle" id="deskSubtitle">اختار مرحلة والعب</div>
     <div class="dossier-stack" id="dossierStack">
     </div>
   </div>
-  <!-- ========== مشهد الديوان المرسوم — لوحة كاملة والعناصر الحية مقصوصة من اللوحة نفسها ========== -->
-  <div class="desk-scene" aria-hidden="true">
-    <div class="scene-canvas" id="sceneCanvas">
-
-      <!-- مروحة السقف المتحركة (اللوحة متولدة من غير مروحة عن قصد عشان دي تركب فوقيها) -->
-      <!-- الظل = نسخة مسطحة من نفس ريش المروحة (نفس viewBox ونفس المسارات) عشان الدوران يبان مرتبط بيها -->
-      <div class="fan-shadow" aria-hidden="true">
-        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
-          <g class="fan-shadow-blades">
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z"/>
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(120 120 45)"/>
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" transform="rotate(240 120 45)"/>
-            <circle cx="120" cy="45" r="14"/>
-          </g>
-        </svg>
-      </div>
-      <div class="scene-fan">
-        <svg viewBox="0 0 240 168" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="fanRodG" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stop-color="#6B5836"/>
-              <stop offset=".5" stop-color="#9C8455"/>
-              <stop offset="1" stop-color="#544324"/>
-            </linearGradient>
-            <radialGradient id="fanHubG" cx=".38" cy=".3" r=".95">
-              <stop offset="0" stop-color="#C4A76E"/>
-              <stop offset="1" stop-color="#5A4728"/>
-            </radialGradient>
-            <linearGradient id="bladeG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#7A6540"/>
-              <stop offset=".55" stop-color="#5E4C2C"/>
-              <stop offset="1" stop-color="#463822"/>
-            </linearGradient>
-          </defs>
-          <rect x="100" y="0" width="40" height="10" rx="4" fill="#3A2E1C"/>
-          <rect x="113" y="8" width="14" height="26" rx="6" fill="url(#fanRodG)"/>
-          <ellipse cx="120" cy="47" rx="32" ry="17" fill="#5A4A2E"/>
-          <ellipse cx="120" cy="43" rx="32" ry="14" fill="#6E5A38"/>
-          <ellipse cx="120" cy="41" rx="26" ry="9" fill="#7E6A44"/>
-          <g class="fan-blades">
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)"/>
-            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none"/>
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(120 120 45)"/>
-            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(120 120 45)"/>
-            <path d="M146,37 C172,24 212,21 232,30 C241,35 241,48 230,53 C207,60 168,58 146,51 Z" fill="url(#bladeG)" transform="rotate(240 120 45)"/>
-            <path d="M150,39 C174,28 210,26 228,33" stroke="rgba(255,232,190,.16)" stroke-width="2.5" fill="none" transform="rotate(240 120 45)"/>
-          </g>
-          <circle cx="120" cy="45" r="12" fill="url(#fanHubG)"/>
-          <circle cx="120" cy="45" r="4.5" fill="#3A2E1C"/>
-        </svg>
-      </div>
-
-      <!-- توهج دافي من لمبات النحاس -->
-      <span class="lamp-glow glow-1"></span>
-      <span class="lamp-glow glow-2"></span>
-
-      <!-- ساعة الحيطة — عقاربها بتتحرك ببالوقت الحقيقي -->
-      <div class="scene-clock">
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="50" cy="50" r="49" fill="#3E3020"/>
-          <circle cx="50" cy="50" r="45" fill="#5C4A2C"/>
-          <circle cx="50" cy="50" r="41" fill="#F5EFDD"/>
-          <g stroke="#4A3A22" stroke-width="2.4" stroke-linecap="round">
-            <line x1="50" y1="12" x2="50" y2="17.5"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(30 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(60 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(90 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(120 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(150 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(180 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(210 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(240 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(270 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(300 50 50)"/>
-            <line x1="50" y1="12" x2="50" y2="17.5" transform="rotate(330 50 50)"/>
-          </g>
-          <line class="hand hand-h" x1="50" y1="52" x2="50" y2="29" stroke="#33270F" stroke-width="4.6" stroke-linecap="round"/>
-          <line class="hand hand-m" x1="50" y1="52" x2="50" y2="18" stroke="#33270F" stroke-width="3.2" stroke-linecap="round"/>
-          <line class="hand hand-s" x1="50" y1="56" x2="50" y2="14.5" stroke="#A6362A" stroke-width="1.5"/>
-          <circle cx="50" cy="50" r="3.4" fill="#33270F"/>
-          <circle cx="50" cy="50" r="1.5" fill="#A6362A"/>
-        </svg>
-      </div>
-
-      <!-- ذرات غبار عايمة في ضوء اللمبات -->
-      <span class="motes"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-
-      <!-- القصاصات التفاعلية: كلها أبناء الكانفاس مباشرة عشان نسبها تطابق الرسم في كل المقاسات -->
-      <button class="prop-sprite sp-phone" tabindex="-1" onclick="window.DeskProps&&DeskProps.ring(event)" title="هاتف المصالح — دوس واسمع الرن" aria-label="هاتف المصالح"></button>
-      <button class="prop-sprite sp-tea" tabindex="-1" onclick="window.DeskProps&&DeskProps.stir(event)" title="شاي؟ دوس وجرب" aria-label="استكان شاي">
-        <span class="tea-steam"><i></i><i></i><i></i><i></i></span>
-      </button>
-      <button class="prop-sprite sp-nuts" tabindex="-1" onclick="window.DeskProps&&DeskProps.crack(event)" title="سوداني! دوس اكشش" aria-label="طبق سوداني"></button>
-      <button class="prop-sprite sp-stamp" tabindex="-1" onclick="window.DeskProps&&DeskProps.hit(event)" title="ادوس بالختم" aria-label="ختم ونهاسة"></button>
-      <button class="prop-sprite sp-papers" tabindex="-1" onclick="window.DeskProps&&DeskProps.flutter(event)" title="ورق رسمي مربوط" aria-label="أوراق رسمية"></button>
-
-      <!-- طبقة تعتيم: لمبة الكهرباء بتنقط أحيانًا زي فكة الوزارات -->
-      <div class="scene-dim" id="sceneDim"></div>
-    </div>
-
-    <!-- ===== عناصر المكتب الحية — مقاعد ثابتة لكل عنصر (Task 26) =====
-         عناصر SVG مستقلة بإحداثيات الشاشة مش الكانفاس: على فون البورتريه كل عنصر
-         ليه مقعد محدد في الشريط الخشبي السفلي — سوداني شمال، شاي في النص، تليفون يمين —
-         والملفات راقدة على الحصيرة فوقهم. مفيش عنصر بيجي على عنصر.
-         على الديسكتوب العناصر المرسومة في اللوحة هي اللي شغالة (القصاصات تفاعلية). -->
-    <button class="svg-prop prop-nuts" tabindex="-1" onclick="window.DeskProps&&DeskProps.crack(event)" title="سوداني! دوس اكشش" aria-label="طبق سوداني">
-      <svg viewBox="0 0 150 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="bowlG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#7A6248"/>
-            <stop offset=".5" stop-color="#54402C"/>
-            <stop offset="1" stop-color="#332417"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="75" cy="126" rx="62" ry="10" fill="rgba(30,12,0,.32)"/>
-        <path d="M14,68 Q18,116 75,118 Q132,116 136,68 Z" fill="url(#bowlG)" stroke="#241608" stroke-width="3.4" stroke-linejoin="round"/>
-        <ellipse cx="75" cy="66" rx="61" ry="15" fill="#4A3826" stroke="#241608" stroke-width="3.4"/>
-        <ellipse cx="75" cy="64" rx="52" ry="11" fill="#2A1D10"/>
-        <g stroke="#7A4E20" stroke-width="2.2">
-          <ellipse cx="42" cy="56" rx="11" ry="8"  fill="#D2A163" transform="rotate(-18 42 56)"/>
-          <ellipse cx="60" cy="50" rx="11" ry="8"  fill="#CE9752" transform="rotate(9 60 50)"/>
-          <ellipse cx="79" cy="46" rx="11" ry="8"  fill="#E0B478" transform="rotate(-5 79 46)"/>
-          <ellipse cx="98" cy="52" rx="11" ry="8"  fill="#D2A163" transform="rotate(15 98 52)"/>
-          <ellipse cx="114" cy="60" rx="10" ry="7" fill="#C08A46" transform="rotate(-12 114 60)"/>
-          <ellipse cx="52" cy="38" rx="10" ry="7"  fill="#E0B478" transform="rotate(-24 52 38)"/>
-          <ellipse cx="72" cy="33" rx="10" ry="7"  fill="#D9A866" transform="rotate(4 72 33)"/>
-          <ellipse cx="92" cy="37" rx="10" ry="7"  fill="#CE9752" transform="rotate(-9 92 37)"/>
-          <ellipse cx="107" cy="45" rx="9"  ry="6.5" fill="#D9A866" transform="rotate(20 107 45)"/>
-          <ellipse cx="62" cy="26" rx="8"  ry="6"  fill="#CE9752" transform="rotate(-14 62 26)"/>
-          <ellipse cx="81" cy="24" rx="8"  ry="6"  fill="#E0B478" transform="rotate(8 81 24)"/>
-        </g>
-        <g fill="#7A4E20">
-          <circle cx="36" cy="53" r="1.5"/><circle cx="54" cy="35" r="1.5"/>
-          <circle cx="76" cy="21" r="1.5"/><circle cx="97" cy="34" r="1.5"/>
-          <circle cx="120" cy="59" r="1.5"/>
-        </g>
-      </svg>
-    </button>
-    <button class="svg-prop prop-tea" tabindex="-1" onclick="window.DeskProps&&DeskProps.stir(event)" title="شاي؟ دوس وجرب" aria-label="استكان شاي">
-      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="teaSaucerG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#E3B45C"/>
-            <stop offset=".55" stop-color="#C08F35"/>
-            <stop offset="1" stop-color="#8A5F1E"/>
-          </linearGradient>
-          <linearGradient id="teaLiquidG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#D0741F"/>
-            <stop offset=".45" stop-color="#A63E0B"/>
-            <stop offset="1" stop-color="#6E2405"/>
-          </linearGradient>
-          <linearGradient id="teaGlassG" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#F5F9F6" stop-opacity=".78"/>
-            <stop offset=".2" stop-color="#CFE0DA" stop-opacity=".26"/>
-            <stop offset=".6" stop-color="#B9CCC6" stop-opacity=".1"/>
-            <stop offset="1" stop-color="#F5F9F6" stop-opacity=".6"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="100" cy="184" rx="80" ry="12" fill="rgba(30,12,0,.32)"/>
-        <ellipse cx="100" cy="162" rx="85" ry="24" fill="url(#teaSaucerG)" stroke="#4A2E10" stroke-width="3"/>
-        <ellipse cx="100" cy="157" rx="59" ry="14" fill="#A97B28" stroke="#6B4A16" stroke-width="2"/>
-        <ellipse cx="100" cy="155" rx="42" ry="9" fill="#8F651E"/>
-        <path d="M64,44 L76,146 Q77,156 88,157 L112,157 Q123,156 124,146 L136,44 Z" fill="url(#teaLiquidG)" stroke="#2E1B0D" stroke-width="3.4" stroke-linejoin="round"/>
-        <path d="M64,44 L76,146 Q77,156 88,157 L96,157 L86,44 Z" fill="url(#teaGlassG)"/>
-        <ellipse cx="100" cy="52" rx="35" ry="10" fill="#E08A2E"/>
-        <ellipse cx="100" cy="50" rx="26" ry="7" fill="#EEAA4C"/>
-        <path d="M89,58 L94,150 M100,59 L100,152 M111,58 L106,150" stroke="rgba(255,235,200,.3)" stroke-width="2.4" fill="none"/>
-        <ellipse cx="100" cy="44" rx="36" ry="11" fill="none" stroke="#2E1B0D" stroke-width="3.4"/>
-        <ellipse cx="100" cy="44" rx="29" ry="7.5" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
-        <path d="M71,60 Q69,100 77,140" stroke="rgba(255,250,235,.5)" stroke-width="4" fill="none" stroke-linecap="round"/>
-      </svg>
-      <span class="tea-steam"><i></i><i></i><i></i><i></i></span>
-    </button>
-    <button class="svg-prop prop-phone" tabindex="-1" onclick="window.DeskProps&&DeskProps.ring(event)" title="هاتف المصالح — دوس واسمع الرن" aria-label="هاتف المصالح">
-      <svg viewBox="0 0 210 240" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <defs>
-          <linearGradient id="phoneBodyG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#4A4A52"/>
-            <stop offset=".4" stop-color="#2C2C34"/>
-            <stop offset="1" stop-color="#16161C"/>
-          </linearGradient>
-          <linearGradient id="phoneHandsetG" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#3E3E48"/>
-            <stop offset="1" stop-color="#101016"/>
-          </linearGradient>
-        </defs>
-        <ellipse cx="105" cy="220" rx="86" ry="12" fill="rgba(30,12,0,.32)"/>
-        <!-- السلك الملفوف -->
-        <path d="M158,172 c16,-2 20,12 7,16 c-13,4 -19,-7 -6,-11 c16,-4 22,12 7,16 c-13,4 -20,-7 -7,-11 c14,-4 21,10 8,15"
-              fill="none" stroke="#101014" stroke-width="4" stroke-linecap="round"/>
-        <!-- الجسم -->
-        <path d="M42,128 Q42,102 70,98 L140,98 Q168,102 168,128 L178,192 Q180,208 162,210 L48,210 Q30,208 32,192 Z"
-              fill="url(#phoneBodyG)" stroke="#0C0C12" stroke-width="3.5" stroke-linejoin="round"/>
-        <rect x="52" y="206" width="22" height="10" rx="4" fill="#0E0E14"/>
-        <rect x="136" y="206" width="22" height="10" rx="4" fill="#0E0E14"/>
-        <!-- لوحة الاتصال -->
-        <circle cx="105" cy="156" r="37" fill="#232329" stroke="#0C0C12" stroke-width="3"/>
-        <circle cx="105" cy="156" r="26" fill="#3A3A42" stroke="#0C0C12" stroke-width="2"/>
-        <g fill="#101016">
-          <circle cx="105" cy="139" r="4.6"/><circle cx="117" cy="144" r="4.6"/>
-          <circle cx="122" cy="156" r="4.6"/><circle cx="117" cy="168" r="4.6"/>
-          <circle cx="105" cy="173" r="4.6"/><circle cx="93" cy="168" r="4.6"/>
-          <circle cx="88" cy="156" r="4.6"/><circle cx="93" cy="144" r="4.6"/>
-        </g>
-        <circle cx="105" cy="156" r="6.5" fill="#17171D"/>
-        <!-- السماعة -->
-        <rect x="58" y="52" width="94" height="34" rx="17" fill="url(#phoneHandsetG)" stroke="#0C0C12" stroke-width="3.5"/>
-        <circle cx="55" cy="76" r="19" fill="url(#phoneHandsetG)" stroke="#0C0C12" stroke-width="3.5"/>
-        <circle cx="155" cy="76" r="19" fill="url(#phoneHandsetG)" stroke="#0C0C12" stroke-width="3.5"/>
-        <path d="M64,94 q8,7 17,8 M146,94 q-8,7 -17,8" stroke="#0C0C12" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <path d="M56,114 Q56,106 66,103" stroke="rgba(200,205,220,.35)" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <path d="M70,60 Q100,54 132,59" stroke="rgba(200,205,220,.28)" stroke-width="3.4" fill="none" stroke-linecap="round"/>
-      </svg>
-    </button>
-  </div>
-
+  <!-- وميض الانتقال وقت فتح المرحلة -->
   <div class="desk-bg-overlay" id="deskBgOverlay"></div>
 </div>
 
-<!-- ==================== SCREEN 2: GAMEPLAY — ورقة على المكتب (Task 26) ==================== -->
-<div class="screen world" id="screenGame">
+<!-- ==================== شاشة ٣: اللعب — شاشة السؤال (Task 28) ==================== -->
+<div class="screen" id="screenGame">
   <div class="game-container">
-    <!-- Top bar -->
+    <!-- الشريط العلوي -->
     <div class="top-bar">
-      <div class="streak-box">
+      <div class="streak-box" title="ستريك الإجابات الصح">
         <span class="streak-fire">★</span>
         <span id="streakNum">0</span>
       </div>
       <div class="powerups">
-        <button class="powerup-btn fifty-futta" id="btnFifty" onclick="useFiftyFifty()" aria-label="فطة تمسح إجابتين غلط" title="فطة! نمسحلك إجابتين غلط">🧽 فطة</button>
+        <button class="powerup-btn fifty-sniper" id="btnSniper" onclick="useSniper()" aria-label="قناص يمسح إجابتين غلط" title="قناص! بيصيب إجابتين غلط بالظبط">🎯 قناص</button>
         <button class="powerup-btn wasta" id="btnWasta" onclick="useWasta()" aria-label="واسطة تخطي السؤال" title="واسطة! تعدي السؤال ده من غير غلطة">🤝 واسطة</button>
-        <button class="powerup-btn tea" id="btnBribe" onclick="useBribe()" aria-label="شاي مع الممتحن يكسب تلميح" title="تتشاي مع الممتحن بـ 15 نقطة ويسرّبلك تلميح">☕ شاي</button>
+        <button class="powerup-btn lamp" id="btnLamp" onclick="useLamp()" aria-label="لمبة مع صاحب الصالة يكسب تلميح" title="تشد لمبة بـ 15 نقطة وصاحب الصالة يوريك طريق الإجابة">💡 لمبة</button>
       </div>
     </div>
 
-    <!-- شريط الحبر — بيسحب مع الوقت ويتحول أحمر في التلت الأخير (Task 26) -->
+    <!-- شريط الوقت — بيسحب مع الوقت وبيتحول وردي وينبض في التلت الأخير -->
     <div class="candle-wrap">
       <div class="ink-bar" aria-hidden="true"><div class="ink-fill" id="inkFill"></div></div>
       <div class="candle-time" id="candleTime">15</div>
     </div>
 
-    <!-- Question card -->
-    <div class="question-card paper-texture" id="questionCard">
-      <!-- قاعدة الديوان: ختم أحمر صغير على ركن الورقة (Task 24 → مكانه على الورقة في Task 26) -->
-      <div class="commit-tag" aria-hidden="true">مفيش رجوع — الملف اللي بيفتح لازم يخلص</div>
+    <!-- كارت السؤال -->
+    <div class="question-card" id="questionCard">
+      <div class="commit-tag" aria-hidden="true">مفيش رجوع — المرحلة اللي بتفتح لازم تخلص</div>
       <div class="file-ref" id="fileRefNum"></div>
       <div id="catBadge" class="cat-badge"></div>
       <div class="question-text" id="questionText"></div>
@@ -363,21 +134,21 @@
         <input type="text" class="text-answer-input" id="textAnswerInput" placeholder="اكتب إجابتك..." autocomplete="off" onkeydown="if(event.key==='Enter')submitTextAnswer()">
         <button class="text-submit-btn" onclick="submitTextAnswer()">أرسل</button>
       </div>
-      <button class="appeal-btn" id="appealBtn" onclick="useAppeal()" style="display:none;">تطلب استئناف؟ (+10 ثواني، رسوم 30%)</button>
+      <button class="appeal-btn" id="appealBtn" onclick="useAppeal()" style="display:none;">وقت زايد؟ +10 ثواني (خصم 30% من النقاط)</button>
       <div class="hint-note" id="hintNote" style="display:none;"></div>
       <div class="margin-note" id="marginNote" style="display:none;"></div>
       <div class="stamp-overlay" id="stampOverlay"></div>
-      <!-- Bribe confirmation overlay -->
-      <div class="bribe-confirm" id="bribeConfirm">
-        <div class="bribe-confirm-text">تدفع 15 نقطة تتشاي مع الممتحن ويسرّبلك تلميح؟ ☕</div>
-        <div class="bribe-confirm-btns">
-          <button class="bribe-confirm-btn bribe-confirm-yes" onclick="confirmBribe()">اتفضل يا فندم</button>
-          <button class="bribe-confirm-btn bribe-confirm-no" onclick="cancelBribe()">لأ، سيبني</button>
+      <!-- تأكيد اللمبة -->
+      <div class="lamp-confirm" id="lampConfirm">
+        <div class="lamp-confirm-text">تدفع 15 نقطة تشد لمبة وصاحب الصالة يوريك طريق الإجابة؟ 💡</div>
+        <div class="lamp-confirm-btns">
+          <button class="lamp-confirm-btn lamp-confirm-yes" onclick="confirmLamp()">هات التلميح</button>
+          <button class="lamp-confirm-btn lamp-confirm-no" onclick="cancelLamp()">لأ، كمل</button>
         </div>
       </div>
-      <!-- Second Witness overlay -->
+      <!-- لحظة الحقيقة -->
       <div class="witness-card" id="witnessCard">
-        <div class="witness-title">متأكد؟<br>عندك ٥ ثواني تغيّر رأيك أو تثبته</div>
+        <div class="witness-title">لحظة الحقيقة!<br>عندك ٥ ثواني تغيّر رأيك أو تثبته</div>
         <div class="witness-timer-wrap">
           <div class="witness-timer-bar"><div class="witness-timer-fill" id="witnessTimerFill"></div></div>
           <span class="witness-timer-num" id="witnessTimerNum">5</span>
@@ -391,15 +162,15 @@
   </div>
 </div>
 
-<!-- ==================== SCREEN 3: BONUS ==================== -->
-<div class="screen world" id="screenBonus">
-  <!-- Bonus Intro -->
-  <div id="bonusIntro" class="bonus-intro bonus-intro-bg paper-texture">
-    <div class="secret-stamp">سرّي</div>
+<!-- ==================== شاشة ٤: جولة المخاطرة ==================== -->
+<div class="screen" id="screenBonus">
+  <!-- تقديم الجولة -->
+  <div id="bonusIntro" class="bonus-intro">
+    <div class="secret-stamp">★ BONUS ★</div>
     <div class="bonus-title">▲ جاهز للمخاطرة؟</div>
     <div class="bonus-rules">
       🎯 تحدي العباقرة — 7 أسئلة مركبة · دقيقة ونصف لكل سؤال<br>
-      إجابة صح: <strong style="color:#6BCB77;">+20</strong> نقطة · إجابة غلط: <strong style="color:#FF6B6B;">-12</strong> نقطة — خمّن من غير ما تعرف وانت خسران!
+      إجابة صح: <strong class="good-text">+20</strong> نقطة · إجابة غلط: <strong class="bad-text">-12</strong> نقطة — خمّن من غير ما تعرف وانت خسران!
     </div>
     <div class="bonus-btns">
       <button class="bonus-btn bonus-btn-risk" onclick="startBonusPlay()">يلا مخاطرة</button>
@@ -407,45 +178,40 @@
     </div>
   </div>
 
-  <!-- Bonus Play -->
-  <div id="bonusPlay" style="display:none; width:100%; max-width:460px; padding:0 16px;">
+  <!-- لعب الجولة -->
+  <div id="bonusPlay" style="display:none;">
     <div class="bonus-hud">
       <div class="bonus-score-indicator" id="bonusScoreInd">0</div>
       <div class="candle-time" id="bonusTime">1:30</div>
     </div>
     <div class="progress-stamps" id="bonusStamps"></div>
-    <div class="question-card paper-texture" id="bonusCard" style="position:relative; overflow:hidden;">
+    <div class="question-card bonus-card" id="bonusCard">
       <div class="question-text" id="bonusQText"></div>
       <div class="options-grid" id="bonusOpts"></div>
       <div class="stamp-overlay" id="bonusStamp"></div>
     </div>
   </div>
 
-  <!-- Bonus End -->
+  <!-- نهاية الجولة -->
   <div id="bonusEnd" style="display:none;">
-    <div class="bonus-end paper-texture" style="border-radius:12px; padding:32px 24px; max-width:420px; width:100%;">
-      <div style="font-family:var(--font-display); font-size:1.3rem; margin-bottom:8px;">نتيجة المخاطرة</div>
-      <div style="font-family:var(--font-display); font-size:2.5rem; margin-bottom:4px;" id="bonusFinalScore">0</div>
+    <div class="bonus-end">
+      <div class="bonus-end-title">نتيجة المخاطرة</div>
+      <div class="bonus-final-score" id="bonusFinalScore">0</div>
       <div id="bonusFinalStampWrap"></div>
-      <div class="bonus-btns" style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+      <div class="bonus-btns">
         <button class="bonus-btn bonus-btn-risk" onclick="openGeniusExplanations()">📖 الاجابات التفصيلية</button>
-        <button class="bonus-btn bonus-btn-skip" onclick="goToCertificate()">شوف الشهادة</button>
+        <button class="bonus-btn bonus-btn-skip" onclick="goToCertificate()">شوف الكأس</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ==================== SCREEN 4: CERTIFICATE ==================== -->
-<div class="screen world" id="screenCert">
+<!-- ==================== شاشة ٥: كأس الأتاري ==================== -->
+<div class="screen" id="screenCert">
   <div class="certificate-container" id="certContainer">
-    <div class="certificate paper-texture" id="certPaper">
-      <div class="cert-edge-top"></div>
-      <div class="cert-edge-bottom"></div>
-      <div class="cert-edge-left"></div>
-      <div class="cert-edge-right"></div>
+    <div class="certificate" id="certPaper">
       <div class="cert-inner">
-        <!-- شبكة الزخرفة التقاطعية اتشالت نهائيًا — كانت بتظهر كشبكة في الصورة المحملة والمستخدم مش عايزها -->
-        <!-- Right column: Photo + Signature (appears on right in RTL) -->
+        <!-- عمود الصورة والتوقيع -->
         <div class="cert-left-col">
           <div class="cert-photo-slot" id="certPhotoSlot" onclick="document.getElementById('certPhotoInput').click()">
             <span id="certPhotoPlaceholder">●</span>
@@ -454,10 +220,10 @@
           <img class="cert-sig" id="certSig" style="display:none" alt="">
           <div class="cert-damgha" id="certDamgha"></div>
         </div>
-        <!-- Left column: All text content (appears on left in RTL) -->
+        <!-- عمود النص -->
         <div class="cert-right-col">
-          <div class="cert-eyebrow">شهادة تقدير — الديوان</div>
-          <div class="cert-title">نتائج التحدي النهائي</div>
+          <div class="cert-eyebrow">كأس الأتاري ★</div>
+          <div class="cert-title">نتائج الجولة النهائية</div>
           <div class="cert-name" id="certName"></div>
           <div class="cert-score-block">
             <div class="cert-score-num" id="certScoreNum">0</div>
@@ -467,28 +233,27 @@
           <div class="cert-phrase" id="certPhrase"></div>
           <div class="cert-stamp" id="certStamp"></div>
           <div class="badges-row" id="badgesRow"></div>
-          <!-- المرفقات (Prompt 5) -->
+          <!-- الأوسمة -->
           <div class="enclosures-section" id="enclosuresSection" style="display:none">
-            <div class="enclosures-title">المرفقات</div>
+            <div class="enclosures-title">الأوسمة</div>
             <div class="enclosures-row" id="enclosuresRow"></div>
           </div>
-          <!-- رقم مرجعي رسمي (Prompt 6) -->
+          <!-- رقم المرحلة المرجعي -->
           <div class="cert-ref-number" id="certRefNumber"></div>
-          <!-- سطر لوحة الشرف -->
-          <div class="cert-hall-line" id="certHallLine"></div>
+          <!-- سطر الريكورد المحلي -->
+          <div class="cert-record-line" id="certRecordLine"></div>
         </div>
       </div>
     </div>
     <div class="cert-btns">
       <button class="cert-btn cert-btn-share" onclick="shareCert()">▶ شارك</button>
       <button class="cert-btn cert-btn-download" onclick="downloadCert()">◀ حمّل</button>
-      <button class="cert-btn cert-btn-back" onclick="returnToDeskFromCert()">↩ الرجوع للمكتب</button>
+      <button class="cert-btn cert-btn-back" onclick="returnToDeskFromCert()">↩ رجوع للصالة</button>
     </div>
   </div>
 </div>
 
-
-<!-- Achievement Card Overlay (Prompt 4) -->
+<!-- كارت الإنجاز (Overlay) -->
 <div class="achieve-overlay" id="achieveOverlay">
   <div class="achieve-card" id="achieveCard">
     <div class="achieve-stamp" id="achieveStamp"></div>
@@ -499,32 +264,31 @@
       <div class="achieve-ref" id="achieveRef"></div>
       <div class="achieve-btns">
         <button class="achieve-back-btn achieve-explain-btn" onclick="openAchieveExplanations()">📖 الاجابات التفصيلية</button>
-        <button class="achieve-back-btn" onclick="closeAchievementCard()">رجوع للمكتب</button>
+        <button class="achieve-back-btn" onclick="closeAchievementCard()">رجوع للصالة</button>
       </div>
     </div>
   </div>
 </div>
 
-
-<!-- Envelope Overlay (Prompt 5) -->
+<!-- المفاجأة الختامية (Overlay) -->
 <div class="envelope-wrap" id="envelopeWrap">
   <div class="envelope" id="envelope" onclick="openEnvelope()">
     <div class="envelope-flap"></div>
     <div class="envelope-body"></div>
-    <div class="envelope-seal">ديوان</div>
-    <div class="envelope-label">المظروف الختامي</div>
+    <div class="envelope-seal">★</div>
+    <div class="envelope-label">المفاجأة الختامية</div>
   </div>
 </div>
 
-<!-- Card Review Overlay (Prompt 5 - enclosure preview) -->
+<!-- معاينة الأوسمة (Overlay) -->
 <div class="card-review-overlay" id="cardReviewOverlay" onclick="if(event.target===this)closeCardReview()">
   <button class="card-review-close" onclick="closeCardReview()" aria-label="إغلاق المعاينة">✕</button>
   <div id="cardReviewContent"></div>
 </div>
 
-<!-- الاجابات التفصيلية — بتظهر آخر كل ملف/قسم بعد ما يخلص -->
+<!-- الاجابات التفصيلية — بتظهر آخر كل مرحلة بعد ما تخلص -->
 <div class="explain-overlay" id="explainOverlay">
-  <div class="explain-card paper-texture">
+  <div class="explain-card">
     <div class="explain-head">
       <div class="explain-title" id="explainTitle">📖 الاجابات التفصيلية</div>
       <div class="explain-sub" id="explainSub"></div>
@@ -534,7 +298,7 @@
   </div>
 </div>
 
-<!-- بوابة قلب الموبايل — اللعبة طولي على الفون (Task 24)
+<!-- بوابة قلب الموبايل — اللعبة طولي على الفون
      بتظهر بس على الجهاز اللمسي في الوضع العرضي، وبتختفي أول ما تقلب -->
 <div class="rotate-gate" id="rotateGate" aria-hidden="true">
   <div class="rotate-gate-inner">
@@ -544,13 +308,12 @@
       <circle cx="32" cy="82" r="3.5" fill="currentColor"/>
     </svg>
     <div class="rotate-gate-title">اقلب موبايلك</div>
-    <div class="rotate-gate-sub">الديوان بيتقدم بالوضع الطولي 📱<br>قلب الموبايل وكمّل ملفاتك</div>
-    <div class="rotate-gate-stamp">قاعدة الديوان</div>
+    <div class="rotate-gate-sub">الأتاري بيتلعب بالوضع الطولي 📱<br>قلب الموبايل وكمّل مراحلك</div>
+    <div class="rotate-gate-stamp">قاعدة الأتاري</div>
   </div>
 </div>
 
 <script src="data/questions.js"></script>
 <script src="js/game.js"></script>
-<script src="js/ambience.js"></script>
 </body>
 </html>

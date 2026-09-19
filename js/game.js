@@ -1,3 +1,21 @@
+// ==================== حارس تحميل الأسئلة (سيناريو عطل: ملف الأسئلة ما حملش) ====================
+// لو data/questions.js فشل (نسبة ضعيفة على GitHub Pages: كاش قديم/نسبة شبكة)
+// اللعبة كانت هتقف بصمت في نص الكود — دلوقتي بنورّي رسالة واضحة ونوقف الآمن.
+if (typeof MAIN_QUESTIONS === 'undefined' || typeof GENIUS_QUESTIONS === 'undefined') {
+  (function questionsLoadFail() {
+    try {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;inset:auto 12px 12px 12px;z-index:99999;'
+        + 'background:#1a0b0b;color:#ffd7d7;border:3px solid #ff2e88;'
+        + 'font-family:Cairo,Tahoma,sans-serif;font-size:15px;font-weight:700;'
+        + 'padding:14px;border-radius:4px;text-align:center;line-height:1.8;';
+      banner.textContent = '⚠️ حصل عطل في تحميل ملف الأسئلة — حدّث الصفحة (اسحب لتحديث أو دوس F5) ولو تكررت استنى دقيقة وجرّب تاني.';
+      (document.body || document.documentElement).appendChild(banner);
+    } catch (e) {}
+  })();
+  throw new Error('questions.js did not load — game halted safely');
+}
+
 // ==================== INK SETTLE ====================
 function inkSettle(el) {
   if (!el) return;
@@ -30,18 +48,18 @@ const GAME_POINTS = {
   mainSlow: 5,       // صح في التلت الأخير
   bonusCorrect: 20,  // جولة المخاطرة — إجابة صح
   bonusPenalty: 12,  // جولة المخاطرة — إجابة غلط
-  appealPenalty: 10  // عقوبة الغلط/الوقت خلص بعد الاستئناف
+  appealPenalty: 10  // عقوبة الغلط/الوقت خلص بعد الوقت الزايد
 };
 
-// ثوابت الخصائص: ثمن شاي الممتحن + الثواني اللي بيضيفها الاستئناف
-const BRIBE_COST = 15;
+// ثوابت الخصائص: ثمن لمبة صاحب الصالة + الثواني اللي بيضيفها الوقت الزايد
+const LAMP_COST = 15;
 const APPEAL_BONUS_TIME = 10;
 
-// لحظة أول اختيار للاعب — بتتثبت قبل كارت الشاهد عشان وقت التثبيت ما يحاسبش على اللاعب
+// لحظة أول اختيار للاعب — بتتثبت قبل كارت التثبيت عشان وقت التثبيت ما يحاسبش على اللاعب
 let answerPickedAt = 0;
 
 // ⚡ نقاط السرعة: التلت بيتحسب على وقت السؤال نفسه
-// (لو اللاعب استأنف +10 ثواني — التلت بيتحسب على الوقت الممتد عشان الاستئناف ما يعاقبش مرتين)
+// (لو اللاعب خد وقت زايد +10 ثواني — التلت بيتحسب على الوقت الممتد عشان ما يعاقبش مرتين)
 function speedTierPoints() {
   const q = getCurrentQuestion();
   const limit = (q && q.time) ? q.time : QUESTION_TIME;
@@ -58,6 +76,282 @@ function speedTierTag(points) {
   if (points >= GAME_POINTS.mainFast) return '⚡ إجابة برق';
   if (points >= GAME_POINTS.mainMid) return '⏱️ في الموعد';
   return '🕯️ آخر التلت';
+}
+
+// ==================== SAFE STORAGE ====================
+// كل وصول للتخزين المحلي بيمر من الـ helpers دي — المتصفحات اللي بتقفل
+// localStorage (الوضع الخاص/حجب الكوكيز) ما بتبوظش اللعبة كلها (Task 31)
+function storeGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function storeSet(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) {}
+}
+function storeDel(key) {
+  try { localStorage.removeItem(key); } catch (e) {}
+}
+
+// ==================== الذاكرة الاحتياطية — قفل الدخلة (Task 34 · المستوى 1) ====================
+// الدخلة الواحدة في الجولة محفوظة في localStorage بس — اللي بيمسح بيانات الموقع
+// بيرجع يلعب من الأول كأنه جديد. الحل من غير سيرفر: تسجيل الجولة بيتكتب كمان في
+// 3 مخازن احتياطية (كوكيز + IndexedDB + Cache API) وكل نسخة فيها بصمة الموسم.
+// لو localStorage اتفضى والنسخ لسه فاكرة نفس الموسم — القفل بيرجع يتركب لوحده.
+// بصراحة كاملة: «Clear site data» الكامل بيمسح كل المخازن مرة واحدة — ده قفل ضد
+// العبث مش ضد القرصنة، ودي أقصى حاجة ينفعها موقع ثابت من غير backend.
+
+const MEM_COOKIE = 'atariMem';
+const MEM_IDB_NAME = 'atariGuardDB';
+const MEM_IDB_STORE = 'mem';
+const MEM_IDB_KEY = 'seasonReg';
+const MEM_CACHE_NAME = 'atari-guard-v1';
+const MEM_CACHE_URL = '/__atari_mem__';
+
+// نقية للاختبارات: حمولة المارايا = بصمة الموسم | اسم اللاعب (مشفر عشان | جوه الاسم ما تكسرش)
+function buildMemPayload(seasonHash, name) {
+  const h = String(seasonHash || '');
+  if (!/^\d{1,15}$/.test(h)) return '';
+  const n = normalizeNamePure(name || '');
+  if (!n) return '';
+  return h + '|' + encodeURIComponent(n);
+}
+
+// نقية للاختبارات: قراءة بحرص — أي حمولة مش مفهومة = مفيش ذاكرة
+function parseMemPayload(raw) {
+  if (typeof raw !== 'string' || !raw) return null;
+  const parts = raw.split('|');
+  if (parts.length !== 2) return null;
+  if (!/^\d{1,15}$/.test(parts[0])) return null;
+  let n = '';
+  try { n = decodeURIComponent(parts[1]); } catch (e) { return null; }
+  n = normalizeNamePure(n);
+  if (!n) return null;
+  return { hash: parts[0], name: n };
+}
+
+// نقية للاختبارات: قرار الاسترجاع — القفل بيرجع بس لو المارايا فاكرة نفس الموسم الحالي
+function backupLockDecision(mem, curHash) {
+  if (!mem || !mem.hash || !mem.name) return null;
+  if (String(mem.hash) !== String(curHash)) return null;
+  return mem.name;
+}
+
+// نقية للاختبارات: مساحة تخزين صغيرة جداً = أغلب الظن وضع مؤقت (تخفي كروم)
+function quotaLooksEphemeral(quota) {
+  if (typeof quota !== 'number' || !isFinite(quota) || quota <= 0) return false;
+  return quota < 300 * 1024 * 1024;
+}
+
+// نقية للاختبارات: سباق مع الوقت — مخزن عاير ما يعلّقش الإقلاع للأبد
+function promiseTimeout(p, ms, fallback) {
+  return new Promise(function (resolve) {
+    let done = false;
+    const t = setTimeout(function () { if (!done) { done = true; resolve(fallback); } }, ms);
+    Promise.resolve(p).then(function (v) {
+      if (!done) { done = true; clearTimeout(t); resolve(v); }
+    }).catch(function () {
+      if (!done) { done = true; clearTimeout(t); resolve(fallback); }
+    });
+  });
+}
+
+// فتح قاعدة المارايا — مفيش indexedDB = null والنداء بيتعامل معاه كفشل عادي
+function idbOpenSafe() {
+  if (typeof indexedDB === 'undefined') return null;
+  try {
+    const req = indexedDB.open(MEM_IDB_NAME, 1);
+    req.onupgradeneeded = function () {
+      try { req.result.createObjectStore(MEM_IDB_STORE); } catch (e) {}
+    };
+    return req;
+  } catch (e) { return null; }
+}
+
+// مارايا التخزين — كل واحدة معزولة، وفشلها المتوقع جزء من التصميم
+const MEM_MIRRORS = [
+  {
+    id: 'cookie',
+    get: function () {
+      if (typeof document === 'undefined') return Promise.resolve(null);
+      try {
+        const m = document.cookie.match(new RegExp('(?:^|; )' + MEM_COOKIE + '=([^;]*)'));
+        return Promise.resolve(m ? decodeURIComponent(m[1]) : null);
+      } catch (e) { return Promise.resolve(null); }
+    },
+    set: function (payload) {
+      try {
+        document.cookie = MEM_COOKIE + '=' + encodeURIComponent(payload) + '; Path=/; Max-Age=31536000; SameSite=Lax';
+        return Promise.resolve(true);
+      } catch (e) { return Promise.resolve(false); }
+    },
+    del: function () {
+      try {
+        document.cookie = MEM_COOKIE + '=; Path=/; Max-Age=0; SameSite=Lax';
+        return Promise.resolve(true);
+      } catch (e) { return Promise.resolve(false); }
+    }
+  },
+  {
+    id: 'idb',
+    get: function () {
+      return new Promise(function (resolve) {
+        const req = idbOpenSafe();
+        if (!req) return resolve(null);
+        req.onerror = function () { resolve(null); };
+        req.onblocked = function () { resolve(null); };
+        req.onsuccess = function () {
+          const db = req.result;
+          try {
+            const tx = db.transaction(MEM_IDB_STORE, 'readonly');
+            const r = tx.objectStore(MEM_IDB_STORE).get(MEM_IDB_KEY);
+            r.onsuccess = function () { resolve(r.result == null ? null : String(r.result)); };
+            r.onerror = function () { resolve(null); };
+            tx.oncomplete = function () { try { db.close(); } catch (e) {} };
+          } catch (e) { resolve(null); try { db.close(); } catch (e2) {} }
+        };
+      });
+    },
+    set: function (payload) {
+      return new Promise(function (resolve) {
+        const req = idbOpenSafe();
+        if (!req) return resolve(false);
+        req.onerror = function () { resolve(false); };
+        req.onblocked = function () { resolve(false); };
+        req.onsuccess = function () {
+          const db = req.result;
+          try {
+            const tx = db.transaction(MEM_IDB_STORE, 'readwrite');
+            tx.objectStore(MEM_IDB_STORE).put(payload, MEM_IDB_KEY);
+            tx.oncomplete = function () { try { db.close(); } catch (e) {} resolve(true); };
+            tx.onerror = function () { try { db.close(); } catch (e2) {} resolve(false); };
+          } catch (e) { resolve(false); try { db.close(); } catch (e2) {} }
+        };
+      });
+    },
+    del: function () {
+      return new Promise(function (resolve) {
+        const req = idbOpenSafe();
+        if (!req) return resolve(false);
+        req.onerror = function () { resolve(false); };
+        req.onblocked = function () { resolve(false); };
+        req.onsuccess = function () {
+          const db = req.result;
+          try {
+            const tx = db.transaction(MEM_IDB_STORE, 'readwrite');
+            tx.objectStore(MEM_IDB_STORE).delete(MEM_IDB_KEY);
+            tx.oncomplete = function () { try { db.close(); } catch (e) {} resolve(true); };
+            tx.onerror = function () { try { db.close(); } catch (e2) {} resolve(false); };
+          } catch (e) { resolve(false); try { db.close(); } catch (e2) {} }
+        };
+      });
+    }
+  },
+  {
+    id: 'cache',
+    get: function () {
+      if (typeof caches === 'undefined') return Promise.resolve(null);
+      try {
+        return caches.open(MEM_CACHE_NAME)
+          .then(function (c) { return c.match(MEM_CACHE_URL).then(function (r) { return r ? r.text() : null; }); })
+          .catch(function () { return null; });
+      } catch (e) { return Promise.resolve(null); }
+    },
+    set: function (payload) {
+      if (typeof caches === 'undefined') return Promise.resolve(false);
+      try {
+        return caches.open(MEM_CACHE_NAME)
+          .then(function (c) { return c.put(MEM_CACHE_URL, new Response(payload)); })
+          .then(function () { return true; })
+          .catch(function () { return false; });
+      } catch (e) { return Promise.resolve(false); }
+    },
+    del: function () {
+      if (typeof caches === 'undefined') return Promise.resolve(false);
+      try {
+        return caches.open(MEM_CACHE_NAME)
+          .then(function (c) { return c.delete(MEM_CACHE_URL); })
+          .catch(function () { return false; });
+      } catch (e) { return Promise.resolve(false); }
+    }
+  }
+];
+
+// الكتابة في كل المارايا — فشل واحدة ما بيقفلش الباقي
+function writeMemoryMirror(payload, mirrors) {
+  if (!payload) return Promise.resolve(false);
+  const list = Array.isArray(mirrors) ? mirrors : MEM_MIRRORS;
+  const calls = list.map(function (m) {
+    try {
+      return Promise.resolve(m.set(payload)).catch(function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  });
+  return Promise.all(calls).then(function (res) {
+    return res.some(function (v) { return v === true; });
+  });
+}
+
+// القراءة من كل المارايا — أول ذاكرة سليمة بتكسب
+function readMemoryBackup(mirrors) {
+  const list = Array.isArray(mirrors) ? mirrors : MEM_MIRRORS;
+  const calls = list.map(function (m) {
+    try {
+      return Promise.resolve(m.get()).catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  });
+  return Promise.all(calls).then(function (raws) {
+    for (let i = 0; i < raws.length; i++) {
+      const mem = parseMemPayload(raws[i]);
+      if (mem) return mem;
+    }
+    return null;
+  });
+}
+
+// مسح كل المارايا — بيترنادى من حراسة الموسم وقت جولة جديدة
+function wipeMemoryBackups(mirrors) {
+  const list = Array.isArray(mirrors) ? mirrors : MEM_MIRRORS;
+  const calls = list.map(function (m) {
+    try {
+      return Promise.resolve(m.del()).catch(function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  });
+  return Promise.all(calls).then(function () { return true; });
+}
+
+// رجوع القفل من المارايا — لو localStorage اتضاف والنسخ لسه فاكرة نفس الموسم
+function restoreRegistrationFromBackup() {
+  let cur;
+  try { cur = computeSeasonHash(); } catch (e) { return Promise.resolve(false); }
+  return promiseTimeout(readMemoryBackup(), 1500, null).then(function (mem) {
+    const name = backupLockDecision(mem, cur);
+    if (!name) return false;
+    storeSet(REG_KEY, name);                       // القفل بيرجع لمكانه الأصلي
+    writeMemoryMirror(buildMemPayload(cur, name)); // المخازن الناقصة بتتكمل لوحدها
+    showEntryLocked();
+    return true;
+  }).catch(function () { return false; });
+}
+
+// كشف الوضع بلا ذاكرة (تخفي/حجب تخزين) — تحذير بس من غير حجب، عشان ما نبوظش
+// تجربة لاعب جديد شغال على جهاز مساحته قليلة
+function showMemNote() {
+  const el = document.createElement('div');
+  el.className = 'mem-note';
+  el.innerHTML = '<strong>👁️ وضع بلا ذاكرة</strong><span>المتصفح في وضع التخفي أو بيقفل التخزين — اللعبة هتشتغل عادي بس الدخلة مش هتتحفظ والريكورد هيتنسى أول ما تقفل.</span>';
+  document.body.appendChild(el);
+  setTimeout(function () { el.classList.add('on'); }, 80);
+  setTimeout(function () {
+    el.classList.remove('on');
+    setTimeout(function () { el.remove(); }, 600);
+  }, 6400);
+}
+
+function memProbe() {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.storage || !navigator.storage.estimate) return;
+    navigator.storage.estimate().then(function (est) {
+      if (est && quotaLooksEphemeral(est.quota)) showMemNote();
+    }).catch(function () {});
+  } catch (e) {}
 }
 
 // ==================== STATE ====================
@@ -77,7 +371,7 @@ const state = {
   hasFifty: true,
   hasBribe: true,
   hasWasta: true,
-  isMuted: localStorage.getItem('diwanMuted') === 'true',
+  isMuted: storeGet('diwanMuted') === 'true',
   bonusCurrentQ: 0,
   bonusCorrect: 0,
   bonusWrong: 0,
@@ -93,9 +387,9 @@ const state = {
 // ==================== LOCALSTORAGE PERSISTENCE ====================
 const STORAGE_KEY = 'diwanGameState';
 // مفتاح خفيف منفصل: لحظة المؤقت الحالية (بتتكتب كل ثانية) — عشان تجميد واستكمال الوقت
-// لو اللاعب خرج من الملف أو عمل ريفريش، بيرجع يلاقي نفس الثواني المتبقية مش وقت كامل من الأول
+// لو اللاعب خرج من المرحلة أو عمل ريفريش، بيرجع يلاقي نفس الثواني المتبقية مش وقت كامل من الأول
 const DOC_TIME_KEY = 'diwanDocTime';
-// سجل الموظفين: كل موظف ليه دخلة واحدة في الجولة (بيتسجل أول ما الشهادة تتعرض)
+// سجل اللاعبين: كل لاعب ليه دخلة واحدة في الجولة (بيتسجل أول ما الكأس تتعرض)
 // بيتصفّر مع الجولة الجديدة (حراسة الموسم) — يعني كل جولة أسئلة جديدة = فرصة جديدة
 const REG_KEY = 'diwanRegisteredName';
 
@@ -110,33 +404,67 @@ const SAVEABLE_KEYS = [
 ];
 
 function saveState() {
-  try {
-    const data = {};
-    for (const k of SAVEABLE_KEYS) {
-      data[k] = state[k];
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {}
+  const data = {};
+  for (const k of SAVEABLE_KEYS) {
+    data[k] = state[k];
+  }
+  storeSet(STORAGE_KEY, JSON.stringify(data));
+}
+
+// نقية للاختبارات: تعقيم بيانات الحفظ الراجعة من التخزين — التخزين مصدر غير موثوق
+// (JSON سليم بس حقول فاسدة: أرقام نصية، كائنات بقت strings، مصفوفات بقت كائنات…)
+// أي حقل مش بشكله بيرجع للقيمة الافتراضية الآمنة بدل ما يبوظ اللعبة بعدين.
+function sanitizeStatePure(data) {
+  const d = (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+  const num = (v, fb) => { const n = Number(v); return (isFinite(n) ? n : fb); };
+  const str = (v, fb) => (typeof v === 'string' ? v : fb);
+  const bool = (v) => !!v;
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const out = {};
+  out.playerName = str(d.playerName, '');
+  out.playerAvatar = str(d.playerAvatar, '');
+  out.playerPhoto = str(d.playerPhoto, '');
+  out.playerSignature = str(d.playerSignature, '');
+  out.mainScore = num(d.mainScore, 0);
+  out.bonusScore = num(d.bonusScore, 0);
+  out.totalScore = num(d.totalScore, 0);
+  out.correctCount = num(d.correctCount, 0);
+  out.wrongCount = num(d.wrongCount, 0);
+  out.maxStreak = num(d.maxStreak, 0);
+  out.currentStreak = num(d.currentStreak, 0);
+  out.answerTimes = arr(d.answerTimes).map(v => num(v, 0));
+  out.hasFifty = bool(d.hasFifty);
+  out.hasBribe = bool(d.hasBribe);
+  out.hasWasta = bool(d.hasWasta);
+  out.bonusPlayed = bool(d.bonusPlayed);
+  out.bonusCorrect = num(d.bonusCorrect, 0);
+  out.bonusWrong = num(d.bonusWrong, 0);
+  out.docsState = obj(d.docsState);
+  out.docProgress = obj(d.docProgress);
+  out.docCorrectCounts = obj(d.docCorrectCounts);
+  out.earnedCards = arr(d.earnedCards).filter(c => c && typeof c === 'object');
+  out.activeSetId = str(d.activeSetId, null);
+  out.certRefId = str(d.certRefId, null);
+  return out;
 }
 
 function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return false;
-    const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object') return false;
-    for (const k of SAVEABLE_KEYS) {
-      if (data[k] !== undefined) state[k] = data[k];
-    }
-    return true;
-  } catch (e) {
-    return false;
+  const raw = storeGet(STORAGE_KEY);
+  if (!raw) return false;
+  let data = null;
+  try { data = JSON.parse(raw); } catch (e) { return false; }
+  if (!data || typeof data !== 'object') return false;
+  const safe = sanitizeStatePure(data);
+  for (const k of SAVEABLE_KEYS) {
+    if (safe[k] !== undefined) state[k] = safe[k];
   }
+  return true;
 }
 
 function clearSavedState() {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(DOC_TIME_KEY);
+  storeDel(STORAGE_KEY);
+  storeDel(DOC_TIME_KEY);
 }
 
 // نقية للاختبارات: توحيد الاسم — مسافات زايدة ومسافات مكررة بتتشال عشان "أحمد " = "أحمد"
@@ -145,7 +473,7 @@ function normalizeNamePure(name) {
 }
 
 // نقية للاختبارات: ثواني الاستكمال — المتبقي المحفوظ مش بيتعدّى وقت السؤال الأصلي
-// (لو اتسجل وقت بعد استئناف والاستئناف اتلغى، القفعة بتحمي من وقت زيادة)
+// (لو اتسجل وقت بعد وقت زايد والوقت الزايد اتلغى، القفعة بتحمي من وقت زيادة)
 function resumeSecondsPure(savedT, questionTime, appealBonus) {
   const s = Number(savedT);
   if (!isFinite(s) || s <= 0) return questionTime;
@@ -154,34 +482,30 @@ function resumeSecondsPure(savedT, questionTime, appealBonus) {
 
 // كتابة/مسح لحظة المؤقت — بيتكتب كل ثانية والمؤقت شغال، وبيمسح أول ما السؤال يخلص
 function saveDocTimeSnapshot() {
-  try {
-    if (!currentDocSetId || !currentDocQuestions.length) return;
-    localStorage.setItem(DOC_TIME_KEY, JSON.stringify({
-      setId: currentDocSetId,
-      idx: currentDocQuestionIdx,
-      t: timeLeft,
-      appeal: !!state.appealUsed
-    }));
-  } catch (e) {}
+  if (!currentDocSetId || !currentDocQuestions.length) return;
+  storeSet(DOC_TIME_KEY, JSON.stringify({
+    setId: currentDocSetId,
+    idx: currentDocQuestionIdx,
+    t: timeLeft,
+    appeal: !!state.appealUsed
+  }));
 }
 
 function clearDocTimeSnapshot() {
-  try { localStorage.removeItem(DOC_TIME_KEY); } catch (e) {}
+  storeDel(DOC_TIME_KEY);
 }
 
-// استرجاع لحظة المؤقت لو الملف اتفتح تاني على نفس السؤال — جوهر قاعدة تجميد واستكمال
+// استرجاع لحظة المؤقت لو المرحلة اتفتح تاني على نفس السؤال — جوهر قاعدة تجميد واستكمال
 function applyDocTimeSnapshot() {
-  try {
-    const raw = localStorage.getItem(DOC_TIME_KEY);
-    if (!raw) return false;
-    const snap = parseDocSnapshotPure(raw);
-    if (!snap || snap.setId !== currentDocSetId || snap.idx !== currentDocQuestionIdx) return false;
-    const cap = resumeSecondsPure(snap.t, questionTimeLimit(), snap.appeal ? APPEAL_BONUS_TIME : 0);
-    timeLeft = cap;
-    state.appealUsed = !!snap.appeal;
-    clearDocTimeSnapshot();
-    return true;
-  } catch (e) { return false; }
+  const raw = storeGet(DOC_TIME_KEY);
+  if (!raw) return false;
+  const snap = parseDocSnapshotPure(raw);
+  if (!snap || snap.setId !== currentDocSetId || snap.idx !== currentDocQuestionIdx) return false;
+  const cap = resumeSecondsPure(snap.t, questionTimeLimit(), snap.appeal ? APPEAL_BONUS_TIME : 0);
+  timeLeft = cap;
+  state.appealUsed = !!snap.appeal;
+  clearDocTimeSnapshot();
+  return true;
 }
 
 // نقية للاختبارات: قراءة لحظة المؤقت المخزنة — بترجع لقطة سليمة بس أو null
@@ -199,22 +523,22 @@ function parseDocSnapshotPure(raw) {
   } catch (e) { return null; }
 }
 
-// نقية للاختبارات: فهرس استكمال آمن داخل الملف — بره الحدود = مفيش استكمال (-1)
+// نقية للاختبارات: فهرس استكمال آمن داخل المرحلة — بره الحدود = مفيش استكمال (-1)
 function resumeIdxPure(idx, len) {
   const i = Math.floor(Number(idx));
   if (!isFinite(i) || i < 0) return -1;
   if (!isFinite(len) || len <= 0) return -1;
-  if (i >= len) return -1; // اللقطة بتصفّر أول ما الملف يخلص — فهرس بره الحدود = لقطة قديمة فاسدة
+  if (i >= len) return -1; // اللقطة بتصفّر أول ما المرحلة يخلص — فهرس بره الحدود = لقطة قديمة فاسدة
   return i;
 }
 
 function getDocTimeSnapshot() {
-  try { return parseDocSnapshotPure(localStorage.getItem(DOC_TIME_KEY)); } catch (e) { return null; }
+  return parseDocSnapshotPure(storeGet(DOC_TIME_KEY));
 }
 
 // قاعدة الدخلة الواحدة (Task 24): لو التاب اتقفل وسط سؤال — الرجوع بيفتح نفس السؤال
 // لوحده من غير لمسة، والمؤقت بيكمل من نفس الثانية (اتجمّد وهو غايب). يعني مفيش
-// أي طريق ترجع بيها للمكتب من جوه الملف قبل ما تجاوب.
+// أي طريق ترجع بيها للصالة من جوه المرحلة قبل ما تجاوب.
 function resumeDocFromSnapshot() {
   const snap = getDocTimeSnapshot();
   if (!snap) return false;
@@ -245,25 +569,41 @@ function getAudioCtx() {
 
 function playSound(fn) {
   if (state.isMuted) return;
-  try { fn(getAudioCtx()); } catch(e) {}
+  try {
+    const ctx = getAudioCtx();
+    // الموبايل: القفل/الخروج من التطبيق بيوقّف الـ AudioContext — من غير resume الصوت بيموت لحد ريفريش (Task 36)
+    if (ctx.state === 'suspended') ctx.resume();
+    fn(ctx);
+  } catch(e) {}
 }
 
+// رجعة اللعبة من الخلفية: بنصحّي السياق فورًا (لو المتصفح اسمح — غير كده أول دوسة هتصحّيه) (Task 36)
+document.addEventListener('visibilitychange', () => {
+  try {
+    if (!document.hidden && audioCtx && audioCtx.state === 'suspended' && !state.isMuted) {
+      audioCtx.resume().catch(() => {});
+    }
+  } catch (e) {}
+});
+
 const Sound = {
+  // نقرة أركيد 8-bit — كل زرار في اللعبة بيتنادى بيها (Task 28)
   penTap() {
     playSound(ctx => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'square';
-      osc.frequency.value = 800;
-      gain.gain.value = 0.15;
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(990, ctx.currentTime + 0.045);
+      gain.gain.value = 0.12;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
       osc.connect(gain).connect(ctx.destination);
-      osc.start(); osc.stop(ctx.currentTime + 0.06);
+      osc.start(); osc.stop(ctx.currentTime + 0.08);
     });
   },
 
-  // مسحة الفطة — هواء بينضف الإجابات الغلط
-  futtaSwoosh() {
+  // ضربة القناص — لفحة نويز بتمنسح الإجابات الغلط
+  sniperSwoosh() {
     playSound(ctx => {
       const dur = 0.3;
       const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
@@ -283,8 +623,8 @@ const Sound = {
     });
   },
 
-  // شاي مع الممتحن — دقتين ملعقة على الاستكان
-  teaSip() {
+  // لمبة صاحب الصالة — نغمتين نيون صافيتين (دقة تشغيل اللمبة)
+  lampDing() {
     playSound(ctx => {
       const t = ctx.currentTime;
       [2150, 2650].forEach((f, i) => {
@@ -377,12 +717,124 @@ const Sound = {
       noise.connect(bp).connect(gain).connect(ctx.destination);
       noise.start(); noise.stop(ctx.currentTime + 0.6);
     });
+  },
+
+  // إجابة صح — أربيجيو صاعد كلاسيكي (Task 28 أركيد)
+  correct() {
+    playSound(ctx => {
+      const t = ctx.currentTime;
+      [[659, 0], [784, 0.08], [1047, 0.16]].forEach(n => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, t + n[1]);
+        g.gain.exponentialRampToValueAtTime(0.11, t + n[1] + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.001, t + n[1] + 0.16);
+        o.connect(g).connect(ctx.destination);
+        o.start(t + n[1]); o.stop(t + n[1] + 0.18);
+      });
+    });
+  },
+
+  // إجابة غلط — هبوط ثقيل محبط (بالعافية)
+  wrong() {
+    playSound(ctx => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(82, ctx.currentTime + 0.32);
+      g.gain.value = 0.16;
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.34);
+      o.connect(g).connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.36);
+    });
+  },
+
+  // عملة الأتاري — نغمة العملة الشهيرة عند البداية
+  coin() {
+    playSound(ctx => {
+      const t = ctx.currentTime;
+      [[988, 0, 0.08], [1319, 0.09, 0.38]].forEach(n => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, t + n[1]);
+        g.gain.exponentialRampToValueAtTime(0.12, t + n[1] + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.001, t + n[1] + n[2]);
+        o.connect(g).connect(ctx.destination);
+        o.start(t + n[1]); o.stop(t + n[1] + n[2] + 0.04);
+      });
+    });
+  },
+
+  // فانفار الكأس — لحظة الفوز الكاملة
+  fanfare() {
+    playSound(ctx => {
+      const t = ctx.currentTime;
+      [[523, 0, 0.14], [659, 0.14, 0.14], [784, 0.28, 0.14], [1047, 0.42, 0.5]].forEach(n => {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.value = n[0];
+        g.gain.setValueAtTime(0.0001, t + n[1]);
+        g.gain.exponentialRampToValueAtTime(0.12, t + n[1] + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + n[1] + n[2]);
+        o.connect(g).connect(ctx.destination);
+        o.start(t + n[1]); o.stop(t + n[1] + n[2] + 0.05);
+      });
+    });
+  },
+
+  // باور أب — سويب صاعد سريع (واسطة/قناص/لمبة)
+  powerup() {
+    playSound(ctx => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(330, ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.22);
+      g.gain.value = 0.1;
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.26);
+      o.connect(g).connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.28);
+    });
+  },
+
+  // لفحة البوم — ضربة قصيرة قوية لما الستريك يوصل مرحلة (Task 29)
+  // طبقتين: همهمة منخفضة بتنزل بسرعة + نفخة نويز قصيرة (إحساس اللفحة)
+  boom() {
+    playSound(ctx => {
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(160, t);
+      o.frequency.exponentialRampToValueAtTime(40, t + 0.28);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(g).connect(ctx.destination);
+      o.start(t); o.stop(t + 0.32);
+      const len = Math.floor(ctx.sampleRate * 0.12);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const ng = ctx.createGain();
+      ng.gain.value = 0.1;
+      noise.connect(ng).connect(ctx.destination);
+      noise.start(t); noise.stop(t + 0.12);
+    });
   }
 };
 
 // ==================== MUTE ====================
 // الكتم بقى على مستوى الـ AudioContext نفسه (suspend) — بيقطع أي صوت فورًا:
-// أجواء + مؤثرات + أصوات الخصائص، ومش بيسيب حاجة تكمّل في الخلفية أبدًا
+// المؤثرات + أصوات الخصائص، ومش بيسيب حاجة تكمّل في الخلفية أبدًا
 function applyMuteIcon() {
   const btn = document.getElementById('muteBtn');
   if (btn) btn.textContent = state.isMuted ? '🔇' : '🔊';
@@ -402,18 +854,16 @@ function showAudioNote(msg) {
 
 function toggleMute() {
   state.isMuted = !state.isMuted;
-  localStorage.setItem('diwanMuted', state.isMuted);
+  storeSet('diwanMuted', state.isMuted);
   applyMuteIcon();
   try {
     if (state.isMuted) {
       if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
     } else {
-      // الاستئناف جوه الكليك نفسه — ده اللي بيفتح الصوت على iOS
+      // الوقت الزايد جوه الكليك نفسه — ده اللي بيفتح الصوت على iOS
       getAudioCtx().resume();
     }
   } catch (e) {}
-  // مزامنة أجواء المكتب المحيطة مع زرار الكتم
-  if (window.Ambience) Ambience.setMuted(state.isMuted);
   showAudioNote(state.isMuted ? '🔇 اتكتم الصوت' : '🔊 الصوت اشتغل');
 }
 applyMuteIcon();
@@ -426,7 +876,7 @@ function switchScreen(from, to) {
   setTimeout(() => {
     // قاعدة أمان: شاشة واحدة فعالة في نفس اللحظة — أي شاشة تانية لسه فعالة
     // بتتقفل كمان (كان بيحصل تعارض لما from مش هي فعلاً الشاشة المفتوحة،
-    // زي "شوف شهادتك" بعد الاستعادة: المكتب فضل فعال جنب الشهادة)
+    // زي "شوف كأسك" بعد الاستعادة: الصالة فضل فعال جنب الكأس)
     document.querySelectorAll('.screen.active').forEach(el => {
       el.classList.remove('active', 'fade-out');
       el.style.display = 'none';
@@ -495,10 +945,10 @@ function getActiveSetForCategory(category) {
   return sets[sets.length - 1];
 }
 
-// ===== منطق الإنجاز: الملفات الفاضية (اللي مستنية أسئلتها من الملفات الجاية) متتحسبش =====
+// ===== منطق الإنجاز: المراحل الفاضية (اللي مستنية أسئلتها من المراحل الجاية) متتحسبش =====
 function categoryDone(cat) {
   const active = getActiveSetForCategory(cat);
-  if (!active || active.questions.length === 0) return true; // ملف فاضي = مش محلوب عليه
+  if (!active || active.questions.length === 0) return true; // مرحلة مقفولة = مش محلوب عليها
   return state.docsState[active.setId] === 'done';
 }
 
@@ -509,82 +959,78 @@ function allDocsDone() {
 // Document states — keyed by setId (e.g. "culture-1")
 // state.activeSetId/earnedCards/docCorrectCounts معرّفة في state من الأول
 
-// رقم ملف رسمي بأرقام هندية — لمصة أرشيف مصري
+// رقم مرحلة رسمي بأرقام هندية — لمصة أركيد
 function fileSerial(i) {
   const ar = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
-  return 'ملف رقم ' + ar(41 + i * 7) + ' / ' + ar(2026);
+  return 'مرحلة رقم ' + ar(41 + i * 7) + ' — ' + ar(2026);
 }
 
-// ==================== الملفات المرسومة (Task 25) ====================
-// وش الملف بقى رسمة SVG حية جوه اللعبة بتندمج مع لوحة المكتب —
-// folder-a.png اتشالت (Task 25): كانت صورة كرتون واقعية ملزوقة على رسمة جيبلي
+// ==================== كروت المراحل البكسلية (Task 28) ====================
+// وش الكارت بقى رسمة SVG بكسلية بأركان حادة — نفس روح شاشات الأتاري القديمة.
+// مفيش فلاتر ولا تدرجات معقدة — مربعات crispEdges بس، سريعة ونضيفة.
 const FOLDER_PALETTES = {
-  'cat-culture': { base:'#C08750', dark:'#9A6A3C', flap:'#A9743F', edge:'#7E5430', hi:'#D9A76C' },
-  'cat-sport':   { base:'#8CA3BF', dark:'#6D87A6', flap:'#7790AF', edge:'#57708F', hi:'#A8BCD4' },
-  'cat-logic':   { base:'#9BB08D', dark:'#7C9470', flap:'#8AA07D', edge:'#5F7755', hi:'#B4C6A6' }
+  'cat-culture': { base:'#00E5FF', dark:'#00809A', flap:'#33ECFF', edge:'#053B47', hi:'#A5F8FF' },
+  'cat-sport':   { base:'#FF2E88', dark:'#A80E56', flap:'#FF5CA3', edge:'#4A0528', hi:'#FFB1D6' },
+  'cat-logic':   { base:'#22FF88', dark:'#0E9E52', flap:'#5CFFAC', edge:'#05402A', hi:'#B4FFDA' }
 };
 
 function folderArtSVG(cls, i) {
   const P = FOLDER_PALETTES[cls] || FOLDER_PALETTES['cat-culture'];
-  const uid = 'f' + i; // معرّفات فريدة لكل ملف — الفلاتر مش بتتشارك
-  return '<svg class="folder-art" viewBox="0 0 460 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+  const uid = 'f' + i; // معرّفات فريدة لكل كارت — الأنماط مش بتتشارك
+  return '<svg class="folder-art" viewBox="0 0 460 300" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" shape-rendering="crispEdges">'
     + '<defs>'
-    + '<linearGradient id="' + uid + 'b" x1="0" y1="0" x2="0" y2="1">'
-    + '<stop offset="0" stop-color="' + P.hi + '"/><stop offset=".42" stop-color="' + P.base + '"/><stop offset="1" stop-color="' + P.dark + '"/></linearGradient>'
-    + '<linearGradient id="' + uid + 'f" x1="0" y1="0" x2="0" y2="1">'
-    + '<stop offset="0" stop-color="' + P.flap + '"/><stop offset="1" stop-color="' + P.edge + '"/></linearGradient>'
-    + '<filter id="' + uid + 'g" x="0" y="0" width="100%" height="100%">'
-    + '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch"/>'
-    + '<feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.55 0.55 0.55 0 0"/>'
-    + '</filter>'
+    // شبكة بكسل داكنة فوق الشاشة — إحساس CRT
+    + '<pattern id="' + uid + 'g" width="23" height="23" patternUnits="userSpaceOnUse">'
+    + '<rect width="23" height="23" fill="rgba(5,5,16,.18)"/>'
+    + '</pattern>'
+    // نقط بكسل فاتحة متفرقة — لمعة شاشة
+    + '<pattern id="' + uid + 'd" width="92" height="92" patternUnits="userSpaceOnUse">'
+    + '<rect width="9" height="9" fill="' + P.hi + '" opacity=".20"/>'
+    + '</pattern>'
     + '</defs>'
-    // ===== ورق أبيض طالع من جوه الملف من فوق — إحساس إن الملف مليان أوراق رسمية =====
-    + '<g>'
-    + '<rect x="30" y="46" width="360" height="66" rx="4" fill="#EFE5CB" stroke="#CDBE96" stroke-width="2" transform="rotate(-1.8 210 79)"/>'
-    + '<rect x="54" y="34" width="322" height="68" rx="4" fill="#F7EFDB" stroke="#D8CA9F" stroke-width="2" transform="rotate(1.2 215 68)"/>'
-    // سطور طباعة باهتة على أول ورقة
-    + '<line x1="96" y1="60" x2="330" y2="55" stroke="#C6B88E" stroke-width="2.4" transform="rotate(1.2 215 68)"/>'
-    + '<line x1="108" y1="74" x2="286" y2="71" stroke="#D3C6A0" stroke-width="2" transform="rotate(1.2 215 68)"/>'
+    // جسم الكارت الداكن
+    + '<rect x="0" y="0" width="460" height="300" fill="#12122B"/>'
+    // صفوف بكسل علوية وسفلية — إطار بلون الفئة
+    + '<rect x="0" y="0" width="460" height="16" fill="' + P.dark + '"/>'
+    + '<rect x="0" y="284" width="460" height="16" fill="' + P.dark + '"/>'
+    + '<rect x="22" y="5" width="30" height="6" fill="' + P.hi + '"/>'
+    + '<rect x="60" y="5" width="12" height="6" fill="' + P.hi + '"/>'
+    + '<rect x="392" y="289" width="34" height="6" fill="' + P.hi + '"/>'
+    + '<rect x="434" y="289" width="10" height="6" fill="' + P.hi + '"/>'
+    // شاشة اللعب الملونة بلون الفئة
+    + '<rect x="40" y="42" width="380" height="216" fill="' + P.base + '"/>'
+    + '<rect x="40" y="42" width="380" height="10" fill="' + P.flap + '"/>'
+    + '<rect x="40" y="248" width="380" height="10" fill="' + P.edge + '"/>'
+    + '<rect x="40" y="42" width="14" height="216" fill="' + P.flap + '" opacity=".5"/>'
+    + '<rect x="406" y="42" width="14" height="216" fill="' + P.edge + '" opacity=".5"/>'
+    // سكان-لاينز + لمعة جوه الشاشة
+    + '<rect x="40" y="42" width="380" height="216" fill="url(#' + uid + 'g)"/>'
+    + '<rect x="40" y="42" width="380" height="216" fill="url(#' + uid + 'd)"/>'
+    // مثلث PLAY بكسلي في النص — علامة "اضغط وابدأ"
+    + '<g fill="' + P.edge + '">'
+    + '<rect x="206" y="116" width="12" height="68"/>'
+    + '<rect x="218" y="128" width="12" height="56"/>'
+    + '<rect x="230" y="140" width="12" height="44"/>'
+    + '<rect x="242" y="152" width="12" height="32"/>'
+    + '<rect x="254" y="164" width="12" height="20"/>'
     + '</g>'
-    // ===== جسم الملف الكرتون — حافة فوق بتاب مرتفع في النص يمين (شكل مجلد حقيقي) =====
-    + '<path d="M16,110 Q16,92 33,91 L244,84 L262,52 Q265,45 274,46 L340,50 Q349,51 349,59 L350,78 L428,76 Q445,76 444,92 L446,264 Q446,282 429,283 Q225,292 34,284 Q17,283 16,266 Z" '
-    + 'fill="url(#' + uid + 'b)" stroke="' + P.edge + '" stroke-width="3"/>'
-    // ظل بسيط تحت حافة التاب — بيفصل التاب عن الجسم
-    + '<path d="M244,84 L262,52 Q265,45 274,46 L340,50 Q349,51 349,59 L350,78" fill="none" stroke="rgba(30,14,2,.22)" stroke-width="3.5"/>'
-    // سنّة الوش — شريط علوي داخل الملف بلون أغمق (طية الغلاف)
-    + '<path d="M18,102 Q230,90 442,92 L441,136 Q230,122 19,140 Z" fill="url(#' + uid + 'f)" opacity=".9"/>'
-    + '<path d="M19,140 Q230,122 441,136" fill="none" stroke="rgba(35,20,5,.28)" stroke-width="2.5"/>'
-    // لمعات الرسم واهتراء الورق
-    + '<path d="M26,104 Q230,93 434,96" fill="none" stroke="rgba(255,242,214,.28)" stroke-width="2.5"/>'
-    + '<ellipse cx="70" cy="234" rx="54" ry="26" fill="rgba(255,238,206,.12)"/>'
-    + '<ellipse cx="388" cy="110" rx="44" ry="18" fill="rgba(60,32,8,.10)"/>'
-    // رقعة الرقم الرسمي (نص file-serial بيقعد عليها)
-    + '<rect x="238" y="232" width="200" height="46" rx="8" fill="rgba(255,246,224,.32)"/>'
-    // خيط أحمر متربعط على زرار خشب — رسمة إيد بظل مرسوم
-    + '<g fill="none" stroke-linecap="round">'
-    + '<path d="M206,164 C182,134 278,122 262,162 C256,178 208,186 202,166" stroke="rgba(30,12,4,.20)" stroke-width="6" transform="translate(3,4)"/>'
-    + '<path d="M206,164 C182,134 278,122 262,162 C256,178 208,186 202,166" stroke="#A6362A" stroke-width="5"/>'
-    + '<path d="M252,166 C276,142 196,130 212,170 C218,186 264,190 268,168" stroke="rgba(30,12,4,.20)" stroke-width="6" transform="translate(3,4)"/>'
-    + '<path d="M252,166 C276,142 196,130 212,170 C218,186 264,190 268,168" stroke="#A6362A" stroke-width="5"/>'
-    + '<path d="M259,184 C268,200 258,218 244,228" stroke="#A6362A" stroke-width="4.5"/>'
-    + '</g>'
-    + '<circle cx="232" cy="168" r="17" fill="#8A5A34" stroke="#5E3C20" stroke-width="3"/>'
-    + '<circle cx="231" cy="166.5" r="15" fill="none" stroke="rgba(255,240,210,.22)" stroke-width="1.5"/>'
-    + '<circle cx="227" cy="164" r="2.6" fill="#3E2A14"/><circle cx="237" cy="172" r="2.6" fill="#3E2A14"/>'
-    // حبيبات ورق مرسومة
-    + '<rect x="0" y="0" width="460" height="300" filter="url(#' + uid + 'g)" opacity=".16"/>'
+    // أركان بكسل فاتحة — لمسة التوهج
+    + '<rect x="52" y="54" width="24" height="10" fill="' + P.hi + '"/>'
+    + '<rect x="52" y="64" width="10" height="10" fill="' + P.hi + '"/>'
+    + '<rect x="384" y="236" width="24" height="10" fill="' + P.hi + '"/>'
+    + '<rect x="398" y="226" width="10" height="10" fill="' + P.hi + '"/>'
     + '</svg>';
 }
 
-// توزيع الملفات على المكتب — مروحة راقدة على الديسكتوب، على الفون: صفّة متعرجة
-// الملفات أصغر وعايشة جوه المشهد (الشاي والسنب والتليفون باينين حواليها) — Task 26
+// توزيع المراحل على الصالة — مروحة راقدة على الديسكتوب، على الفون: صفّة متعرجة
+// المراحل أصغر وعايشة جوه المشهد على جريد الصالة) — Task 26
 function deskIsPortrait() {
   return !!(window.matchMedia && window.matchMedia('(max-width: 540px) and (orientation: portrait)').matches);
 }
 function deskOffsetsPure(portrait, i) {
   if (portrait) {
-    // صفّة متعرجة: كل ملف جنب الشغال اللي فوقيه بشيبر — يمين وشمال بالتناوب
-    // والمسافة الأوسع (28px) بتفضح المشهد بين الملفات بدل ما تتغطى عليه
+    // صفّة متعرجة: كل كارت جنب الشغال اللي فوقيه بشيبر — يمين وشمال بالتناوب
+    // والمسافة الأوسع (28px) بتفضح المشهد بين المراحل بدل ما تتغطى عليه
     const lefts = ['46%', '59%', '42%'];
     return { left: lefts[i] || '50%', bottom: 'calc(14px + ' + (2 - i) + ' * (var(--dossier-h) + 28px))' };
   }
@@ -596,12 +1042,12 @@ function deskOffsetsPure(portrait, i) {
   return fan[i] || fan[2];
 }
 function deskRotationPure(portrait, i) {
-  // البورتريه: ميلان واضح زي ملف ربضو بإيد موظف — الديسكتوب زي ما هو
+  // البورتريه: ميلان واضح للكارت — الديسكتوب زي ما هو
   const fan = [-6, 2, 5], stack = [-4.5, 3.2, -2];
   return (portrait ? stack : fan)[i] || 0;
 }
 
-// إعادة توزيع الملفات لو الاتجاه اتقلب وهو واقف على المكتب
+// إعادة توزيع المراحل لو الاتجاه اتقلب وهو واقف على الصالة
 let lastDeskLayout = null;
 window.addEventListener('resize', (function () {
   let t = null;
@@ -621,15 +1067,15 @@ function showDeskHub() {
   // Update subtitle
   const subtitle = document.getElementById('deskSubtitle');
   if (allDocsDone()) {
-    subtitle.textContent = 'تم إنجاز جميع الملفات';
+    subtitle.textContent = 'خلصت كل المراحل — أسطورة!';
   } else {
-    subtitle.textContent = state.playerName + '، اختر ملف للبدء';
+    subtitle.textContent = state.playerName + '، اختار مرحلة والعب!';
   }
 
   const stack = document.getElementById('dossierStack');
   stack.innerHTML = '';
 
-  // توزيع الملفات: مروحة على الديسكتوب / رصّة عمودية على فون البورتريه (Task 25)
+  // توزيع المراحل: مروحة على الديسكتوب / رصّة عمودية على فون البورتريه (Task 25)
   const portraitDesk = deskIsPortrait();
   lastDeskLayout = portraitDesk;
 
@@ -637,7 +1083,7 @@ function showDeskHub() {
     const set = getActiveSetForCategory(cat);
     if (!set) return;
     const docState = state.docsState[set.setId] || 'empty';
-    // ملف مستني أسئلته من الملفات الجاية — بيتعرض مقفول بوسم قريباً
+    // كارت مستني أسئلته من التحديثات الجاية — بيتعرض مقفول بوسم قريباً
     const isEmpty = set.questions.length === 0;
     const rot = deskRotationPure(portraitDesk, i);
 
@@ -649,29 +1095,28 @@ function showDeskHub() {
     dossier.id = 'dossier-' + set.setId;
     dossier.style.setProperty('--dossier-rot', rot + 'deg');
 
-    // توزيع الملفات — بيتغير كليًا بين المروحة والرصّة حسب الاتجاه
-    const off = deskOffsetsPure(portraitDesk, i);
-    dossier.style.left = off.left;
-    dossier.style.bottom = off.bottom;
+    // توزيع المراحل (Task 27 كوميك): المراحل بقت جريد flow طبيعي — مفيش أي
+    // مواقع inline، والميلان بيتحكم فيه --dossier-rot من فوق.
+    // deskOffsetsPure فضلت معرفة كمرجع مختبر، بس مش بتتطبق على الـ DOM.
 
-    // جسم الملف (الميلان والرفع للشاشة كلها CSS على العنصر ده)
+    // جسم المرحلة (الميلان والرفع للشاشة كلها CSS على العنصر ده)
     const body = document.createElement('div');
     body.className = 'dossier-body';
 
-    // ورق الملف باين من الجهة المفتوحة
+    // ورق المرحلة باين من الجهة المفتوحة
     const papers = document.createElement('div');
     papers.className = 'file-papers';
     body.appendChild(papers);
 
-    // وش الملف الكرتون: سطور مطبوعة + رقم رسمي + الخيط الأحمر المربعوط
+    // وش المرحلة: الرسمة البكسلية بلون الفئة + الرقم التسلسلي (Task 28)
     const cover = document.createElement('div');
     cover.className = 'dossier-cover';
     cover.id = 'dossierCover-' + set.setId;
-    // وش الملف: رسمة SVG حية بلون الفئة — خيط أحمر وزرار خشب وحبيبات ورق (Task 25)
+    // وش المرحلة: رسمة بكسل بلون الفئة — شاشة أتاري بمثلث Play (Task 28)
     cover.innerHTML = folderArtSVG(set.colorClass, i) + '<div class="file-serial">' + fileSerial(i) + '</div>';
 
     if (isEmpty) {
-      // الوسم الأحمر — الملف فاضي لحد ما أسئلته توصل
+      // الوسم الوردي — المرحلة مقفولة لحد ما أسئلتها توصل
       const soon = document.createElement('div');
       soon.className = 'soon-tag';
       soon.textContent = 'قريباً';
@@ -683,18 +1128,18 @@ function showDeskHub() {
       seal.id = 'waxSeal-' + set.setId;
       const sealIcon = document.createElement('span');
       sealIcon.className = 'wax-seal-icon';
-      sealIcon.textContent = 'د'; // بصمة ديوان على الختمة (Task 26)
+      sealIcon.textContent = '★'; // نجمة الأتاري على العملة (Task 28)
       seal.appendChild(sealIcon);
       cover.appendChild(seal);
     } else {
       const doneStamp = document.createElement('div');
       doneStamp.className = 'done-stamp';
-      doneStamp.textContent = 'منجز';
+      doneStamp.textContent = 'خلصت';
       cover.appendChild(doneStamp);
     }
     body.appendChild(cover);
 
-    // تاب الفئة — لصاقة على كعب الملف
+    // تاب الفئة — لصاقة على كعب المرحلة
     const tab = document.createElement('div');
     tab.className = 'dossier-tab';
     tab.textContent = set.displayName;
@@ -705,7 +1150,7 @@ function showDeskHub() {
     // دبوس التتبع (جاري) — بره الجسم عشان ميميلش
     const pin = document.createElement('div');
     pin.className = 'dossier-pin';
-    pin.textContent = '📌';
+    pin.textContent = '🕹️';
     dossier.appendChild(pin);
 
     dossier.onclick = () => handleDossierClick(set.setId);
@@ -721,12 +1166,12 @@ function showDeskHub() {
 function handleDossierClick(setId) {
   const docState = state.docsState[setId];
   const set = allQuestionSets.find(s => s.setId === setId);
-  // ملف فاضي — لسه أوراقه جايه في السكة
+  // مرحلة مقفولة — لسه أسئلتها جايه في التحديث
   if (!set || set.questions.length === 0) {
     const el = document.getElementById('dossier-' + setId);
     if (el) { el.classList.add('shake'); setTimeout(() => el.classList.remove('shake'), 400); }
     Sound.penTap();
-    flashDeskNote('الملف ده لسه فاضي… أوراقه جايه في السكة 😉');
+    flashDeskNote('المرحلة دي لسه مقفولة… أسئلتها جايه في التحديث الجاي 😉');
     return;
   }
   if (docState === 'done') {
@@ -745,7 +1190,7 @@ function handleDossierClick(setId) {
   openDossier(setId);
 }
 
-// رسالة سريعة على عنوان المكتب — بتروح لوحدها بعد شوية
+// رسالة سريعة على عنوان الصالة — بتروح لوحدها بعد شوية
 let deskNoteTimer = null;
 function flashDeskNote(msg) {
   const subtitle = document.getElementById('deskSubtitle');
@@ -756,8 +1201,8 @@ function flashDeskNote(msg) {
   deskNoteTimer = setTimeout(() => {
     subtitle.classList.remove('desk-note-flash');
     subtitle.textContent = allDocsDone()
-      ? 'تم إنجاز جميع الملفات'
-      : (state.playerName || '') + '، اختر ملف للبدء';
+      ? 'خلصت كل المراحل — أسطورة!'
+      : (state.playerName || '') + '، اختار مرحلة والعب!';
   }, 2400);
 }
 
@@ -785,7 +1230,7 @@ function openDossier(setId) {
     return;
   }
 
-  // ملف جديد = واسطة بتتجدد (الاستكمال مش بيجدها)
+  // مرحلة جديدة = واسطة بتتجدد (الاستكمال مش بيجدها)
   state.hasWasta = true;
   saveState();
 
@@ -841,19 +1286,20 @@ function loadDocQuestion(setId, startIdx) {
   currentDocSetId = setId;
   // Resume correct count from saved state (not zero)
   docCorrectCount = state.docCorrectCounts[setId] || 0;
-  // فتح الملف من الأول (مش استكمال سؤال جاري) = مفيش وقت متجمّع يتطبق بالغلط
+  // فتح المرحلة من الأول (مش استكمال سؤال جاري) = مفيش وقت متجمّع يتطبق بالغلط
   // applyDocTimeSnapshot بتتحقق بنفسها من تطابق السؤال، وده طبقة أمان زيادة
   state.appealUsed = false;
   loadDocQuestionAt(startIdx);
 }
 
-// السؤال الحالي في الملف المفتوح — مرجع موحد بدل تكرار الوصول للمصفوفة
+// السؤال الحالي في المرحلة المفتوح — مرجع موحد بدل تكرار الوصول للمصفوفة
 // ⚠️ جوهرية للمؤقت: startTimer → questionTimeLimit → getCurrentQuestion
 function getCurrentQuestion() {
   return currentDocQuestions[currentDocQuestionIdx];
 }
 
 function loadDocQuestionAt(idx) {
+  docFeedbackLock = false; // ورقة جديدة = الساحة فتحت تاني (Task 36)
   if (idx >= currentDocQuestions.length) {
     finishDocument(currentDocSetId);
     return;
@@ -864,7 +1310,7 @@ function loadDocQuestionAt(idx) {
   const q = currentDocQuestions[idx];
   questionStartTime = Date.now();
   answerPickedAt = 0;
-  state.appealUsed = false; // كل سؤال بيبدأ من غير استئناف — واسترجاع لحظة المؤقت (تحت في startTimer) ممكن يرجّعه لو الاستئناف اتعمل قبل الخروج
+  state.appealUsed = false; // كل سؤال بيبدأ من غير وقت زايد — واسترجاع لحظة المؤقت (تحت في startTimer) ممكن يرجّعه لو الوقت الزايد اتعمل قبل الخروج
 
   const card = document.getElementById('questionCard');
   card.classList.remove('card-slide-in', 'card-slide-out');
@@ -875,7 +1321,7 @@ function loadDocQuestionAt(idx) {
   const badge = document.getElementById('catBadge');
   badge.textContent = q.levelLabel ? q.catLabel + ' · ' + q.levelLabel : q.catLabel;
   badge.className = 'cat-badge cat-' + q.cat;
-  // رقم الملف الرسمي — سطر الأرشيف فوق الورقة (Task 26)
+  // رقم المرحلة — بادج بكسلي فوق الكارت (Task 28)
   const fileRef = document.getElementById('fileRefNum');
   if (fileRef) {
     const activeSet = allQuestionSets.find(s => s.setId === currentDocSetId);
@@ -905,17 +1351,17 @@ function loadDocQuestionAt(idx) {
     optionsGrid.style.display = '';
     createOptionButtons(optionsGrid, q.options, i => selectDocAnswer(i));
     if (q.allowAppeal) appealBtn.style.display = '';
-    document.getElementById('btnFifty').disabled = !state.hasFifty;
+    document.getElementById('btnSniper').disabled = !state.hasFifty;
   } else if (qType === 'order') {
     orderGrid.style.display = '';
     orderSubmitBtn.style.display = '';
     renderOrderQuestion(q);
-    document.getElementById('btnFifty').disabled = true;
+    document.getElementById('btnSniper').disabled = true;
   } else if (qType === 'text') {
     textAnswerWrap.style.display = '';
     renderTextQuestion();
     if (q.allowAppeal) appealBtn.style.display = '';
-    document.getElementById('btnFifty').disabled = true;
+    document.getElementById('btnSniper').disabled = true;
   }
 
   const stamp = document.getElementById('stampOverlay');
@@ -936,8 +1382,8 @@ function loadDocQuestionAt(idx) {
   marginNote.style.display = 'none';
   marginNote.textContent = '';
 
-  document.getElementById('bribeConfirm').classList.remove('visible');
-  updateBribeButton();
+  document.getElementById('lampConfirm').classList.remove('visible');
+  updateLampButton();
   document.getElementById('btnWasta').disabled = !state.hasWasta;
   showMarginNote(q);
   startTimer();
@@ -945,6 +1391,7 @@ function loadDocQuestionAt(idx) {
 
 // Answer selection for doc-based questions
 function selectDocAnswer(index) {
+  closeLampConfirm(); // أي إجابة بتقفل لوحة اللمبة — مفيش تأكيد لمبة على إجابة رايحة جاية
   clearInterval(timerInterval);
   const q = currentDocQuestions[currentDocQuestionIdx];
   if (!answerPickedAt) answerPickedAt = Date.now();
@@ -993,6 +1440,7 @@ function resolveDocAnswer(index, withMultiplier) {
 }
 
 function finishDocAnswer(isCorrect, points, tag) {
+  docFeedbackLock = true; // الساحة اتقفلت — مفيش أدوات على سؤال خلصانة (Task 36)
   clearDocTimeSnapshot(); // السؤال خلص — مفيش وقت متجمّع يحتاج استكمال
   const answerTime = (Date.now() - questionStartTime) / 1000;
   state.answerTimes.push(answerTime);
@@ -1009,9 +1457,9 @@ function finishDocAnswer(isCorrect, points, tag) {
     if (state.currentStreak > state.maxStreak) state.maxStreak = state.currentStreak;
     document.getElementById('streakNum').textContent = state.currentStreak;
     showStampOn('stampOverlay', 'success', 'صح');
-    Sound.stamp('success');
+    Sound.correct();
     showFloatPoints('+' + points, tag);
-    if (state.currentStreak > 0 && state.currentStreak % 3 === 0) showStreakNotif(state.currentStreak);
+    if (state.currentStreak > 0 && state.currentStreak % 3 === 0) showStreakBoom(state.currentStreak);
   } else {
     state.wrongCount++;
     state.currentStreak = 0;
@@ -1021,7 +1469,7 @@ function finishDocAnswer(isCorrect, points, tag) {
       showFloatPoints('-' + GAME_POINTS.appealPenalty);
     }
     showStampOn('stampOverlay', 'error', 'غلط');
-    Sound.stamp('error');
+    Sound.wrong();
     const card = document.getElementById('questionCard');
     card.classList.add('shake');
     setTimeout(() => card.classList.remove('shake'), 400);
@@ -1029,7 +1477,7 @@ function finishDocAnswer(isCorrect, points, tag) {
 
   witnessActive = false; witnessChoice = -1; witnessChanged = false;
   Sound.penTap();
-  updateBribeButton();
+  updateLampButton();
   saveState();
   advanceToNextQuestion();
 }
@@ -1037,7 +1485,7 @@ function finishDocAnswer(isCorrect, points, tag) {
 // ==================== FINISH DOCUMENT (shows achievement card) ====================
 function finishDocument(setId) {
   clearInterval(timerInterval);
-  clearDocTimeSnapshot(); // الملف خلص خلاص
+  clearDocTimeSnapshot(); // المرحلة خلص خلاص
   state.docsState[setId] = 'done';
   
   // Calculate per-document stats
@@ -1081,7 +1529,7 @@ function finishDocument(setId) {
   currentDocQuestions = [];
   currentDocQuestionIdx = 0;
 
-  // الاجابات التفصيلية بتتعرض بعد قفل كارت الإنجاز (آخر الملف)
+  // الاجابات التفصيلية بتتعرض بعد قفل كارت الإنجاز (آخر المرحلة)
   pendingExplainSetId = setId;
 
   // Show achievement card
@@ -1097,14 +1545,14 @@ function returnToDesk() {
   setTimeout(() => showDeskHub(), 400);
 }
 
-// ⚠️ exitDocToDesk اتشالت في Task 24 — قاعدة الدخلة الواحدة: مفيش رجوع للمكتب
-// من جوه الملف. الزرار اتشال من HTML والدالة معاها، والاستكمال الوحيد المسموح
+// ⚠️ exitDocToDesk اتشالت في Task 24 — قاعدة الدخلة الواحدة: مفيش رجوع للصالة
+// من جوه المرحلة. الزرار اتشال من HTML والدالة معاها، والاستكمال الوحيد المسموح
 // هو resumeDocFromSnapshot (تاب اتقفل بالغلط → نفس السؤال يفتح لوحده).
 
 // ==================== ACHIEVEMENT CARD (Prompt 4) ====================
-// ملف الاجابات التفصيلية اللي مستنية تتعرض بعد قفل كارت الإنجاز (بعد ما الملف يخلص)
+// مراجعة الاجابات التفصيلية اللي مستنية تتعرض بعد قفل كارت الإنجاز (بعد ما المرحلة تخلص)
 let pendingExplainSetId = null;
-// الملف اللي كارت إنجازه ظاهر دلوقتي (عشان زرار الاجابات التفصيلية)
+// المرحلة اللي كارت إنجازه ظاهر دلوقتي (عشان زرار الاجابات التفصيلية)
 let currentAchieveSetId = null;
 
 function showAchievementCard(card) {
@@ -1134,8 +1582,8 @@ function showAchievementCard(card) {
   // Fill content
   document.getElementById('achieveDocName').textContent = card.displayName;
   document.getElementById('achieveScoreLine').textContent = card.correct + ' من ' + card.total + ' صحيح';
-  document.getElementById('achieveDate').textContent = 'حُرر بتاريخ ' + card.date;
-  document.getElementById('achieveRef').textContent = 'رقم الملف: ' + card.refId;
+  document.getElementById('achieveDate').textContent = 'الجولة بتاريخ ' + card.date;
+  document.getElementById('achieveRef').textContent = 'رقم المرحلة: ' + card.refId;
   
   // Show overlay (card appears empty first)
   overlay.classList.add('visible');
@@ -1159,7 +1607,7 @@ function showAchievementCard(card) {
           if (el) el.classList.add('revealed');
         }, (i + 1) * staggerDelay);
       });
-      // Reveal buttons last (مراجعة الاجابات + رجوع للمكتب)
+      // Reveal buttons last (مراجعة الاجابات + رجوع للصالة)
       setTimeout(() => {
         backBtns.forEach(b => b.classList.add('revealed'));
       }, (items.length + 1) * staggerDelay);
@@ -1172,8 +1620,8 @@ function closeAchievementCard() {
   overlay.classList.remove('visible');
   Sound.penTap();
 
-  // الاجابات التفصيلية بتظهر لوحدها آخر كل ملف خلصانه دلوقتي
-  // (مراجعة ملف قديم من المكتب مش بتعرضها تلقائيًا — الزرار موجود في الكارت)
+  // الاجابات التفصيلية بتظهر لوحدها آخر كل مرحلة خلصانة دلوقتي
+  // (مراجعة مرحلة قديمة من الصالة مش بتعرضها تلقائيًا — الزرار موجود في الكارت)
   if (pendingExplainSetId) {
     const setId = pendingExplainSetId;
     pendingExplainSetId = null;
@@ -1184,7 +1632,7 @@ function closeAchievementCard() {
 }
 
 function proceedAfterAchievement() {
-  // Check if all documents done (الملفات الفاضية متتحسبش)
+  // Check if all documents done (المراحل الفاضية متتحسبش)
   const allDone = allDocsDone();
 
   if (allDone) {
@@ -1214,7 +1662,7 @@ function proceedAfterAchievement() {
   }
 }
 
-// زرار كارت الإنجاز — مراجعة اجابات الملف اللي ظاهر دلوقتي أي وقت
+// زرار كارت الإنجاز — مراجعة اجابات المرحلة اللي ظاهر دلوقتي أي وقت
 function openAchieveExplanations() {
   // المستخدم شافها خلاص — متتعرضش تاني تلقائيًا بعد القفل
   pendingExplainSetId = null;
@@ -1222,7 +1670,7 @@ function openAchieveExplanations() {
   showDocExplanations(currentAchieveSetId, null);
 }
 
-// ==================== الاجابات التفصيلية (آخر كل ملف/قسم) ====================
+// ==================== الاجابات التفصيلية (آخر كل مرحلة) ====================
 let explainAfterFn = null;
 
 function openExplainReview(questions, title, sub, afterFn) {
@@ -1284,11 +1732,11 @@ function closeExplainReview() {
   if (typeof fn === 'function') fn();
 }
 
-// الاجابات التفصيلية لملف من الملفات (10 أسئلة)
+// الاجابات التفصيلية لمرحلة من المراحل (10 أسئلة)
 function showDocExplanations(setId, afterFn) {
   const set = allQuestionSets.find(s => s.setId === setId);
   const qs = set ? set.questions : [];
-  openExplainReview(qs, '📖 الاجابات التفصيلية', set ? set.displayName : 'الملف المكتمل', afterFn);
+  openExplainReview(qs, '📖 الاجابات التفصيلية', set ? set.displayName : 'المرحلة المكتملة', afterFn);
 }
 
 // الاجابات التفصيلية لتحدي العباقرة (7 أسئلة)
@@ -1373,25 +1821,17 @@ function showCardReview(card) {
   Sound.penTap();
   const overlay = document.getElementById('cardReviewOverlay');
   const content = document.getElementById('cardReviewContent');
-  
-  // Build a mini achievement card for review
-  const tierColors = {
-    excellent: 'var(--diwan-amber)',
-    vgood: 'var(--diwan-success)',
-    acceptable: 'var(--diwan-ink)',
-    weak: 'var(--diwan-burnt)',
-    rejected: 'var(--diwan-error)'
-  };
-  
+
+  // بيانات الكارت جاية من الحفظ المحلي — بتتعامل كمدخل غير موثوق (escaping — Task 31)
   content.innerHTML = `
     <div class="achieve-card" style="border:3px solid var(--diwan-ink); box-shadow:0 6px 24px rgba(0,0,0,0.2), inset 0 0 0 5px var(--diwan-paper-soft), inset 0 0 0 7px var(--diwan-kraft);">
-      <div class="achieve-stamp tier-${card.tier} stamp-drop" style="opacity:1;transform:scale(1)rotate(0deg)">${card.tierText}</div>
+      <div class="achieve-stamp tier-${escapeHtml(card.tier)} stamp-drop" style="opacity:1;transform:scale(1)rotate(0deg)">${escapeHtml(card.tierText)}</div>
       <div class="card-content revealed">
-        <div class="achieve-doc-name revealed">${card.displayName}</div>
-        <div class="achieve-score-line revealed">${card.correct} من ${card.total} صحيح</div>
-        <div class="achieve-date revealed">حُرر بتاريخ ${card.date}</div>
-        <div class="achieve-ref revealed">رقم الملف: ${card.refId}</div>
-        <button class="achieve-back-btn revealed" style="margin-top:18px;" onclick="closeCardReview()">رجوع للشهادة</button>
+        <div class="achieve-doc-name revealed">${escapeHtml(card.displayName)}</div>
+        <div class="achieve-score-line revealed">${escapeHtml(String(card.correct))} من ${escapeHtml(String(card.total))} صحيح</div>
+        <div class="achieve-date revealed">الجولة بتاريخ ${escapeHtml(card.date)}</div>
+        <div class="achieve-ref revealed">رقم المرحلة: ${escapeHtml(card.refId)}</div>
+        <button class="achieve-back-btn revealed" style="margin-top:18px;" onclick="closeCardReview()">رجوع للكأس</button>
       </div>
     </div>
   `;
@@ -1418,16 +1858,18 @@ function advanceToNextQuestion() {
 
 
 // ==================== ENTRY SCREEN ====================
-// سجل الموظفين: الدخلة مرة واحدة في الجولة — بيتسجل أول ما الشهادة تتعرض
+// سجل اللاعبين: الدخلة مرة واحدة في الجولة — بيتسجل أول ما الكأس تتعرض
 // (عند اكتمال الجولة مش عند البداية — عشان لو حد قفل الصفحة بالغلط مايتقفلش بره للأبد)
 function getRegisteredName() {
-  try { return normalizeNamePure(localStorage.getItem(REG_KEY) || ''); } catch (e) { return ''; }
+  return normalizeNamePure(storeGet(REG_KEY) || '');
 }
 
-function registerEmployeeOnce(name) {
+function registerPlayerOnce(name) {
   const n = normalizeNamePure(name);
   if (!n) return;
-  try { localStorage.setItem(REG_KEY, n); } catch (e) {}
+  storeSet(REG_KEY, n);
+  // Task 34: التسجيل بيتكتب في المارايا الاحتياطية — مسح localStorage لوحده مبقاش كفاية
+  writeMemoryMirror(buildMemPayload(computeSeasonHash(), n));
 }
 
 // شاشة الدخول في وضع "مُسجّل": الفورم بيتخفى وكارت القيد بيبان
@@ -1437,30 +1879,28 @@ function showEntryLocked() {
   if (!locked) return;
   document.getElementById('entryLockedName').textContent = reg || '';
   locked.style.display = 'block';
-  ['photoSlot','nameInput'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-  ['.name-input-wrap','.avatar-grid','.sig-wrap'].forEach(sel => {
-    const el = document.querySelector(sel); if (el) el.style.display = 'none';
-  });
-  const submit = document.getElementById('submitBtn');
-  if (submit) submit.style.display = 'none';
-  const glow = document.getElementById('formGlow');
-  if (glow) glow.style.display = 'none';
+  // بطاقة اللاعب بتتخفي كلها — كارت "إنت داخل" كفاية (Task 28)
+  const paper = document.getElementById('entryPaper');
+  if (paper) paper.style.display = 'none';
 }
 
-// الموظف المتسجل يقدر يفتح شهادته ويستعرض جولته — من غير دخلة جديدة
+// اللاعب المتسجل يقدر يفتح كأسه ويستعرض جولته — من غير دخلة جديدة
 function viewRegisteredCertificate() {
   Sound.penTap();
   const ok = loadState();
-  if (ok && state.playerName) {
-    state.totalScore = state.mainScore + state.bonusScore;
-    switchScreen('screenEntry', 'screenCert');
-    setTimeout(() => renderCertificate(), 400);
+  // سيناريو عطل: الحفظ المحلي بايظ/اتمسح — الزرار عمره ما بيتشرخ،
+  // بنرجّع الاسم من سجل اللاعبين ونعرض الكأس بالدرجات الموجودة (أو صفر)
+  if (!ok || !state.playerName) {
+    state.playerName = getRegisteredName() || state.playerName || 'لاعب';
   }
+  state.totalScore = state.mainScore + state.bonusScore;
+  switchScreen('screenEntry', 'screenCert');
+  setTimeout(() => renderCertificate(), 400);
 }
 
 // ==================== أختام الأقسام — استمارة التوظيف (Task 26) ====================
-// 6 أختام حبرية مرسومة SVG بدل رموز اليونيكود العشرة — كل موظف بياخد ختم قسمه،
-// والاسم بيتخزن (مش الرمز) عشان يظهر مقروء في لوحة الشرف والشهادة
+// 6 أختام حبرية مرسومة SVG بدل رموز اليونيكود العشرة — كل لاعب بياخد ختم قسمه،
+// والاسم بيتخزن (مش الرمز) عشان يظهر مقروء في الريكورد والكأس
 const AVATAR_STAMPS = [
   { id: 'star',     label: 'نجمة',  icon: '<path d="M32 9 L38.9 24.6 L56 26.2 L43.2 37.4 L47.1 54.2 L32 45.4 L16.9 54.2 L20.8 37.4 L8 26.2 L25.1 24.6 Z" fill="currentColor" stroke="none"/>' },
   { id: 'crescent', label: 'هلال',  icon: '<path d="M44 12 A23 23 0 1 0 44 52 A18 18 0 1 1 44 12 Z" fill="currentColor" stroke="none"/>' },
@@ -1597,39 +2037,77 @@ function checkEntryForm() {
 }
 
 // ==================== PHOTO UPLOAD ====================
+// ضغط الصورة قبل التخزين — الصورة الخام (موبايل = 3-8MB) كانت بتتحول data URL
+// وبتفوق حصة localStorage فبيفشل الحفظ كله بصمت (التقدم كله مبيتسجلش).
+// بنصغّر لأقصى 480px بصيغة JPEG — حجم نهائي عشرات الكيلوبايتات بيعيش بأمان في التخزين.
+function compressImageFile(file, onReady, onError) {
+  if (!file || !/^image\//.test(file.type || '')) {
+    if (onError) onError('الملف ده مش صورة — جرب صورة تاني يا بطل');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    const img = new Image();
+    img.onload = function () {
+      try {
+        const MAX = 480;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        let dataUrl;
+        try { dataUrl = cv.toDataURL('image/jpeg', 0.82); }
+        catch (e) { dataUrl = ev.target.result; } // فشل نادر — نكمّل بالأصل
+        onReady(dataUrl);
+      } catch (e) {
+        if (onError) onError('حصلت مشكلة في معالجة الصورة — جرب صورة تاني');
+      }
+    };
+    img.onerror = function () {
+      if (onError) onError('الصورة دي بايظة — جرب صورة تاني يا بطل');
+    };
+    img.src = ev.target.result;
+  };
+  reader.onerror = function () {
+    if (onError) onError('الصورة ما اتقريتش — جرب تاني');
+  };
+  reader.readAsDataURL(file);
+}
+
+function showPhotoError(msg) {
+  try { alert(msg); } catch (e) {}
+}
+
 document.getElementById('photoInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  
-  reader.onload = function(ev) {
-    state.playerPhoto = ev.target.result;
-    
+  compressImageFile(file, function(dataUrl) {
+    state.playerPhoto = dataUrl;
+
     const entrySlot = document.getElementById('photoSlot');
     if (entrySlot) {
-      entrySlot.innerHTML = `<img src="${ev.target.result}" alt="صورة اللاعب">`;
+      entrySlot.innerHTML = `<img src="${dataUrl}" alt="صورة اللاعب">`;
     }
-    
+
     const certSlot = document.getElementById('certPhotoSlot');
     if (certSlot) {
-      certSlot.innerHTML = `<img src="${ev.target.result}" alt="صورة اللاعب">`;
+      certSlot.innerHTML = `<img src="${dataUrl}" alt="صورة اللاعب">`;
     }
-    
+
     Sound.penTap();
-  };
-  
-  reader.readAsDataURL(file);
+  }, showPhotoError);
   e.target.value = '';
 });
 
 function startGame() {
-  // قاعدة الديوان: الموظف له دخلة واحدة في الجولة — المتسجل بيتردّ فوراً
+  // قاعدة الأتاري: اللاعب له دخلة واحدة في الجولة — المتسجل بيتردّ فوراً
   if (getRegisteredName()) { showEntryLocked(); return; }
   state.playerName = normalizeNamePure(document.getElementById('nameInput').value.trim());
-  state.hasWasta = true; // واسطة جديدة مع كل دخول ديوان
-  // تشغيل أجواء المكتب المحيطة (النقرة نفسها تفكّ قفل الصوت في المتصفح)
-  if (window.Ambience) Ambience.unlock();
-  Sound.stamp('success');
+  state.hasWasta = true; // واسطة جديدة مع كل دخول
+  // نقرة العملة — نفس النقرة بتفك قفل الصوت في المتصفح (iOS)
+  Sound.coin();
   switchScreen('screenEntry', 'screenDesk');
   setTimeout(() => showDeskHub(), 400);
   saveState();
@@ -1661,7 +2139,7 @@ function formatTimeLeft(t) {
 }
 
 function createOptionButtons(gridEl, options, clickHandler) {
-  // حروف رسمية زي ورقة الامتحان — أ/ب/ج/د في خانة مختومة جنب كل اختيار (Task 26)
+  // حروف الاختيارات — أ/ب/ج/د في خانة بكسل جنب كل اختيار (Task 28)
   const LETTERS_AR = ['أ', 'ب', 'ج', 'د', 'هـ'];
   gridEl.innerHTML = '';
   options.forEach((opt, i) => {
@@ -1686,12 +2164,18 @@ function startTimer() {
   // كل سؤال ليه وقته الخاص — الشمعة بتتولّد من وقت السؤال نفسه
   currentQuestionTime = questionTimeLimit();
   timeLeft = currentQuestionTime;
-  // تجميد واستكمال: لو خرجنا من الملف (أو الريفريش حصل) وسط السؤال ده — بنكمل بالثواني المتبقية
+  // تجميد واستكمال: لو خرجنا من المرحلة (أو الريفريش حصل) وسط السؤال ده — بنكمل بالثواني المتبقية
   // ده بيقفل غش الخروج والدخول اللي كان بيجدد الوقت من الأول
   applyDocTimeSnapshot();
   updateTimerDisplay();
   updateCandleVisual();
+  resumeTimer();
+}
 
+// مُشغّل الشمعة — نفس نبضة السير بلا إعادة تصفير الثواني
+// بتستخدم في بداية السؤال وبعد "أغيّرها" في لحظة الحقيقة (الشمعة بتحرق من فين وقفت)
+function resumeTimer() {
+  clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     timeLeft--;
     updateTimerDisplay();
@@ -1709,7 +2193,7 @@ function startTimer() {
 function updateTimerDisplay() { document.getElementById('candleTime').textContent = formatTimeLeft(Math.max(0, timeLeft)); }
 
 // وسم منطقة التلت — أخضر = التلت الأول (+15) · أصفر = التاني (+10) · أحمر = الأخير (+5)
-// دالة مشتركة بين شريط الملفات وعداد جولة المخاطرة
+// دالة مشتركة بين شريط المراحل وعداد جولة المخاطرة
 function timeZoneClass(pct) {
   if (pct > 0.66) return 'zone-fast';
   if (pct > 0.33) return 'zone-mid';
@@ -1717,7 +2201,7 @@ function timeZoneClass(pct) {
 }
 
 function updateCandleVisual() {
-  // بعد الاستئناف التلت بيتحسب على الوقت الممتد — نفس مرجع حساب النقاط بالظبط
+  // بعد الوقت الزايد التلت بيتحسب على الوقت الممتد — نفس مرجع حساب النقاط بالظبط
   const total = currentQuestionTime + (state.appealUsed ? APPEAL_BONUS_TIME : 0);
   const pct = Math.min(1, Math.max(0, timeLeft / total));
   const timeEl = document.getElementById('candleTime');
@@ -1733,6 +2217,8 @@ function updateCandleVisual() {
 }
 
 function handleTimeout() {
+  docFeedbackLock = true; // الساحة اتقفلت — مفيش أدوات على سؤال خلصانة (Task 36)
+  closeLampConfirm(); // لوحة اللمبة المفتوحة متتسابش على سؤال خلص وقته
   // Record answer time for badge calculation (MEDIUM FIX)
   state.answerTimes.push((Date.now() - questionStartTime) / 1000);
   
@@ -1783,13 +2269,13 @@ function handleTimeout() {
   }
 
   showStampOn('stampOverlay', 'error', 'غلط');
-  Sound.stamp('error');
+  Sound.wrong();
 
   const card = document.getElementById('questionCard');
   card.classList.add('shake');
   setTimeout(() => card.classList.remove('shake'), 400);
 
-  updateBribeButton();
+  updateLampButton();
   saveState(); // نتيجة السؤال اللي خلص بالوقت تتسجل برضه (مثل finishDocAnswer)
   advanceToNextQuestion();
 }
@@ -1801,6 +2287,11 @@ let witnessTimerId = null;      // setInterval id for witness countdown
 let witnessTimeLeft = 5;        // 5-second mini timer
 let witnessChanged = false;     // did the player use "change" already?
 const WITNESS_TIME = 5;
+
+// قفل ساحة الإجابة (Task 36): بيتقد في لحظة الإجابة/المهلة وبيتفتح لما الورقة الجاية تترسم.
+// من غيره: دوسة واسطة في مهلة العرض (1.5 ث) بتتحرق الأداة وبتعمل advance مزدوج = سؤال بيتخطى،
+// والقناص/اللمبة/الوقت الزايد بتتحرق على سؤال ميت — دوس الإبهام على الموبايل أسرع من المهلة.
+let docFeedbackLock = false;
 
 function updateWitnessTimerDisplay() {
   const num = document.getElementById('witnessTimerNum');
@@ -1841,6 +2332,10 @@ function changeWitness() {
     }
   });
 
+  // الشمعة بترجع تحرق من نفس الثانية — أول ما اللاعب ضغط أول اختيار السير اتوقف،
+  // و"أغيّرها" مش معناها وقت تفكير لا نهائي (قاعدة تجميد واستكمال — نفس فلسفة الريفريش)
+  resumeTimer();
+
   Sound.penTap();
   // اللاعب هيختار اختيار جديد — selectDocAnswer هتتصرف على طول
   // لأن witnessChanged بقى true فبتروح resolveDocAnswer مباشرة
@@ -1872,7 +2367,12 @@ function advanceCard(cardId, nextLoadFn) {
 function showStampOn(elementId, type, text) {
   const stamp = document.getElementById(elementId);
   stamp.className = 'stamp-overlay stamp-' + type;
-  stamp.textContent = text;
+  // الإطار بيلف الكلمة نفسها — span.stamp-text جوه الغلاف (Task 27 كوميك)
+  stamp.textContent = '';
+  const stampText = document.createElement('span');
+  stampText.className = 'stamp-text';
+  stampText.textContent = text;
+  stamp.appendChild(stampText);
   void stamp.offsetWidth;
   stamp.classList.add('animate');
 }
@@ -1890,12 +2390,70 @@ function showFloatPoints(text, tag, anchorEl) {
   setTimeout(() => el.remove(), 1000);
 }
 
-function showStreakNotif(streak) {
+// ==================== لفحة البوم — ستريك كبير (Task 29) ====================
+// كل 3 إجابات صح ورا بعض اللعبة بتفرقع — والنص بيتدرج مع الدرجات
+
+// نقية للاختبارات: بتحدد درجة ونص اللفحة حسب عدد الستريك
+// 3 → بوم! · 6 → بوم! بوم! · 9 → سلطان! · 12+ → سلطان بلا منافس!
+// غير كده (صفر / مش مضاعف 3 / سالب / مش رقم) → مفيش لفحة (null)
+function streakBoomPure(streak) {
+  if (typeof streak !== 'number' || !isFinite(streak)) return null;
+  if (streak <= 0 || streak % 3 !== 0) return null;
+  const level = streak / 3;
+  if (level === 1) return { level: 1, text: 'بوم!' };
+  if (level === 2) return { level: 2, text: 'بوم! بوم!' };
+  if (level === 3) return { level: 3, text: 'سلطان!' };
+  return { level: 4, text: 'سلطان بلا منافس!' };
+}
+
+function showStreakBoom(streak) {
+  const boom = streakBoomPure(streak);
+  if (!boom) return;
+  Sound.boom();
+
   const el = document.createElement('div');
-  el.className = 'streak-notif';
-  el.textContent = `★ ستريك ${streak}!`;
+  el.className = 'streak-boom';
+  el.dataset.level = String(boom.level);
+
+  // شظايا التفقع — 12 قطعة نيون بتترمي من النص
+  const bits = document.createElement('div');
+  bits.className = 'boom-bits';
+  const bitColors = ['var(--yellow)', 'var(--pink)', 'var(--cyan)', 'var(--green)'];
+  for (let i = 0; i < 12; i++) {
+    const b = document.createElement('i');
+    b.className = 'boom-bit';
+    const ang = (Math.PI * 2 * i) / 12 + Math.random() * 0.5;
+    const dist = 70 + Math.random() * 90;
+    b.style.setProperty('--bx', Math.round(Math.cos(ang) * dist) + 'px');
+    b.style.setProperty('--by', Math.round(Math.sin(ang) * dist) + 'px');
+    b.style.background = bitColors[i % bitColors.length];
+    b.style.animationDelay = (Math.random() * 0.08) + 's';
+    bits.appendChild(b);
+  }
+
+  const word = document.createElement('div');
+  word.className = 'boom-word';
+  word.textContent = boom.text;
+
+  const sub = document.createElement('div');
+  sub.className = 'boom-sub';
+  sub.textContent = '★ ستريك ' + streak + ' ★';
+
+  el.appendChild(bits);
+  el.appendChild(word);
+  el.appendChild(sub);
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1500);
+
+  // من درجة سلطان وطالع — الشاشة كلها بتتهز لفة
+  const scr = document.getElementById('screenGame');
+  if (boom.level >= 3 && scr) {
+    scr.classList.remove('boom-shake');
+    void scr.offsetWidth;
+    scr.classList.add('boom-shake');
+    setTimeout(() => scr.classList.remove('boom-shake'), 420);
+  }
+
+  setTimeout(() => el.remove(), 1100);
 }
 
 // نقية للاختبارات: تختار إجابتين غلط (مش الإجابة الصح) من إجمالي الاختيارات
@@ -1905,42 +2463,44 @@ function pickTwoWrong(correct, total) {
   return shuffleArray(indices).slice(0, 2);
 }
 
-function useFiftyFifty() {
+function useSniper() {
   if (!state.hasFifty) return;
-  if (witnessActive) return; // كارت الشاهد واقف — مفيش فطة دلوقتي (زي باقي الأدوات)
+  if (docFeedbackLock) return; // ساحة الإجابة مقفولة — مفيش قناص على سؤال خلصانة (Task 36)
+  if (witnessActive) return; // كارت التثبيت واقف — مفيش قناص دلوقتي (زي باقي الأدوات)
   // 50/50 only works for MCQ questions
   const q = getCurrentQuestion();
   const qType = q.type || 'mcq';
   if (qType !== 'mcq') {
     // Brief shake to indicate not applicable
-    const btn = document.getElementById('btnFifty');
+    const btn = document.getElementById('btnSniper');
     btn.classList.add('shake');
     setTimeout(() => btn.classList.remove('shake'), 400);
     return;
   }
   state.hasFifty = false;
-  document.getElementById('btnFifty').disabled = true;
+  document.getElementById('btnSniper').disabled = true;
   Sound.penTap();
   saveState();
   const btns = document.querySelectorAll('#optionsGrid .option-btn');
-  // مسحة الفطة — إجابتين غلط يختفوا في مسحة واحدة
+  // طلقة القناص — إجابتين غلط بيتمسحوا في طلقة واحدة
   pickTwoWrong(q.correct, btns.length).forEach(i => {
     btns[i].classList.add('strikethrough');
     btns[i].disabled = true;
   });
   const grid = document.getElementById('optionsGrid');
-  grid.classList.remove('futta-sweep');
+  grid.classList.remove('sniper-sweep');
   void grid.offsetWidth;
-  grid.classList.add('futta-sweep');
-  Sound.futtaSwoosh();
-  setTimeout(() => grid.classList.remove('futta-sweep'), 700);
+  grid.classList.add('sniper-sweep');
+  Sound.sniperSwoosh();
+  setTimeout(() => grid.classList.remove('sniper-sweep'), 700);
 }
 
 // ==================== واسطة — تعدي السؤال بالسطرة ====================
-// بتتتجدد مع كل ملف جديد — بتخطي السؤال من غير نقط ولا غلطة والستريك زي ما هو
+// بتتتجدد مع كل مرحلة جديدة — تخطي السؤال من غير نقط ولا غلطة والستريك زي ما هو
 function useWasta() {
   if (!state.hasWasta) return;
-  if (witnessActive) return; // الشاهد واقف في وشك — مفيش واسطة دلوقتي
+  if (docFeedbackLock) return; // ساحة الإجابة مقفولة — الواسطة في مهلة العرض كانت بتحرق الأداة وتخطّي سؤال زيادة (Task 36)
+  if (witnessActive) return; // التثبيت واقف في وشك — مفيش واسطة دلوقتي
   if (currentDocQuestionIdx >= currentDocQuestions.length) return;
 
   state.hasWasta = false;
@@ -1955,9 +2515,12 @@ function useWasta() {
   if (ordBtn) ordBtn.disabled = true;
 
   showStampOn('stampOverlay', 'wasta', 'واسطة');
-  Sound.stamp('success');
+  Sound.powerup();
   Sound.penTap();
   saveState();
+  // لقطة مؤقت السؤال المتخطى بتتمسح — السؤال المعدّي بالواسطة ما بيرجعش أبدًا
+  // لو التاب اتقفل في نص المهلة (نفس قاعدة دخلة واحدة لكل سؤال — Task 31)
+  clearDocTimeSnapshot();
   // ندور ورقة تانية: السؤال اللي بعده من غير حساب — مفيش صح ولا غلط
   advanceToNextQuestion();
 }
@@ -2031,7 +2594,7 @@ let bonusQuestionTime = 15;
 
 function startBonusTimer() {
   clearInterval(bonusTimerInterval);
-  // وقت السؤال في جولة المخاطرة = زمنه الأصلي من حقل time (زي الملفات بالظبط)
+  // وقت السؤال في جولة المخاطرة = زمنه الأصلي من حقل time (زي المراحل بالظبط)
   const bq = bonusQuestions[state.bonusCurrentQ];
   bonusQuestionTime = (bq && bq.time) ? bq.time : 15;
   bonusTimeLeft = bonusQuestionTime;
@@ -2047,7 +2610,7 @@ function startBonusTimer() {
   }, 1000);
 }
 
-// عداد جولة المخاطرة بين على الشاشة — نفس شريط التلتات بتاع الملفات
+// عداد جولة المخاطرة بين على الشاشة — نفس شريط التلتات بتاع المراحل
 function updateBonusTimerDisplay() {
   const el = document.getElementById('bonusTime');
   if (!el) return;
@@ -2091,7 +2654,7 @@ function selectBonusAnswer(index) {
     state.bonusScore += GAME_POINTS.bonusCorrect;
     btns[index].classList.add('correct');
     showStampOn('bonusStamp', 'success', 'صح');
-    Sound.stamp('success');
+    Sound.correct();
     showFloatPoints('+' + GAME_POINTS.bonusCorrect, '', document.getElementById('bonusCard'));
     document.getElementById('bonusStamp' + state.bonusCurrentQ).classList.add('done', 'correct-stamp');
   } else {
@@ -2100,7 +2663,7 @@ function selectBonusAnswer(index) {
     btns[index].classList.add('wrong');
     btns[q.correct].classList.add('correct');
     showStampOn('bonusStamp', 'error', 'غلط');
-    Sound.stamp('error');
+    Sound.wrong();
     showFloatPoints('-' + GAME_POINTS.bonusPenalty, '', document.getElementById('bonusCard'));
     document.getElementById('bonusStamp' + state.bonusCurrentQ).classList.add('done', 'wrong-stamp');
     
@@ -2135,7 +2698,7 @@ function endBonusRound() {
   }
 
   // الاجابات التفصيلية لتحدي العباقرة بتظهر لوحدها آخر القسم
-  // (لو اللاعب مسرحع وضغط شوف الشهادة قبلها — منظهرهاش على شاشة الشهادة)
+  // (لو اللاعب مسرحع وضغط شوف الكأس قبلها — منظهرهاش على شاشة الكأس)
   setTimeout(() => {
     const bonusScreen = document.getElementById('screenBonus');
     const endPanel = document.getElementById('bonusEnd');
@@ -2181,7 +2744,7 @@ function getEvaluationData(playerScore, maxPossibleScore) {
 
 // ==================== CERTIFICATE ====================
 function goToCertificate() {
-  Sound.penTap();
+  Sound.fanfare();
   state.totalScore = state.mainScore + state.bonusScore;
   switchScreen('screenBonus', 'screenCert');
   setTimeout(() => renderCertificate(), 400);
@@ -2212,7 +2775,7 @@ function renderCertificate() {
 
   if (state.playerPhoto) {
     const slot = document.getElementById('certPhotoSlot');
-    slot.innerHTML = `<img src="${state.playerPhoto}" alt="صورة اللاعب"><input type="file" id="certPhotoInput" accept="image/*" style="display:none">`;
+    slot.innerHTML = `<img src="${escapeHtml(state.playerPhoto)}" alt="صورة اللاعب"><input type="file" id="certPhotoInput" accept="image/*" style="display:none">`;
   }
 
   let maxPossibleScore = getMaxPossibleScore();
@@ -2266,25 +2829,21 @@ function renderCertificate() {
       const rn = String(Math.floor(Math.random() * 900) + 100);
       state.certRefId = yr + '/' + rn;
     }
-    certRefEl.textContent = 'رقم الملف: ' + state.certRefId;
+    certRefEl.textContent = 'رقم المرحلة: ' + state.certRefId;
   }
 
-  // 3.5 لوحة الشرف — النتيجة بتتسجل أول ما الشهادة تظهر
-  const hallLine = document.getElementById('certHallLine');
-  if (hallLine) {
-    const res = recordInHall(state.totalScore, Math.round(evalData.percentage), evalData.stampConfig.text);
-    if (res.rank > 0) {
-      hallLine.textContent = res.isBest
-        ? '🏆 نتيجة جديدة في لوحة الشرف — مركز ' + res.rank
-        : '🏆 لوحة الشرف محتفظة بأحسن نتيجة ليك — مركز ' + res.rank;
-    } else {
-      hallLine.textContent = '🏆 اللوحة مليانة أشطر من كده… ورّقها المرة الجاية!';
-    }
+  // 3.5 الريكورد المحلي — المقارنة بأحسن نتيجة على الجهاز بتتم أول ما الكأس تظهر
+  const recordLine = document.getElementById('certRecordLine');
+  if (recordLine) {
+    const rec = updateRecord(state.totalScore, state.playerName, state.playerAvatar);
+    recordLine.textContent = rec.isNew
+      ? '🏆 ريكورد جديد على الجهاز ده — ' + state.totalScore + ' نقطة!'
+      : '🏆 الريكورد لسه ثابت: ' + rec.best.score + ' نقطة (' + rec.best.name + ')';
   }
 
-  // 3.6 قيد في سجل الموظفين — لحظة الشهادة = الجولة اكتملت = الدخلة اتحسبت
+  // 3.6 قيد في سجل اللاعبين — لحظة الكأس = الجولة اكتملت = الدخلة اتحسبت
   // من هنا شاشة الدخول بتقفل للاسم ده لحد ما جولة أسئلة جديدة تبدأ
-  registerEmployeeOnce(state.playerName);
+  registerPlayerOnce(state.playerName);
   
   // 4. Circular stamp with Arabic text (enhance cert-stamp)
   enhanceCertStamp(stampEl);
@@ -2296,18 +2855,17 @@ function renderCertificate() {
   enableCertButtonsWhenReady();
 }
 
-// Cert-specific photo upload
+// Cert-specific photo upload — بنفس ضغط الصورة عشان الحفظ ما يبوظش (نفس سيناريو الدخلة)
 document.addEventListener('change', function(e) {
   if (e.target && e.target.id === 'certPhotoInput') {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      state.playerPhoto = ev.target.result;
+    compressImageFile(file, function(dataUrl) {
+      state.playerPhoto = dataUrl;
       const slot = document.getElementById('certPhotoSlot');
-      slot.innerHTML = `<img src="${ev.target.result}" alt="صورة اللاعب"><input type="file" id="certPhotoInput" accept="image/*" style="display:none">`;
-    };
-    reader.readAsDataURL(file);
+      slot.innerHTML = `<img src="${dataUrl}" alt="صورة اللاعب"><input type="file" id="certPhotoInput" accept="image/*" style="display:none">`;
+    }, showPhotoError);
+    e.target.value = '';
   }
 });
 
@@ -2319,7 +2877,7 @@ function calculateBadges(pct) {
   if (avgTime < 5) badges.push('● سريع البديهة');
   if (state.correctCount >= 4) badges.push('◆ عبقري الألغاز');
   if (state.maxStreak >= 3) badges.push('★ ما وقفش');
-  if (pct >= 90) badges.push('★ بطل الديوان');
+  if (pct >= 90) badges.push('★ سلطان الأتاري');
   if (state.bonusScore > 0) badges.push('◆ جولة المخاطرة');
   return badges;
 }
@@ -2344,24 +2902,32 @@ function shareCert() {
   Sound.penTap();
   let maxPossibleScore = getMaxPossibleScore();
   const evalData = getEvaluationData(state.totalScore, maxPossibleScore);
-  const text = `ديوان الحكمة — ${state.playerName} حصل على ${state.totalScore} نقطة (${Math.round(evalData.percentage)}%) — ${evalData.stampConfig.text} ◆`;
+  const text = `سلطان الأتاري ★ ${state.playerName} حصد ${state.totalScore} نقطة (${Math.round(evalData.percentage)}%) — ${evalData.stampConfig.text} ◆`;
+  // سقاطة نصية موحّدة — بتستخدم لو المتصفح مش داعم أو فشل رسم الصورة
+  function shareTextFallback() {
+    if (navigator.share) {
+      navigator.share({ title: 'سلطان الأتاري', text }).catch(() => {});
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => alert('تم النسخ!')).catch(() => alert(text));
+    } else {
+      alert(text);
+    }
+  }
   if (navigator.share && navigator.canShare) {
     captureCertificate(canvas => {
       canvas.toBlob(blob => {
-        const file = new File([blob], 'diwan-certificate.png', { type: 'image/png' });
+        // لو فشل تحويل الكأس لصورة (blob فاضي) — منشاركش ملف بايظ، نص الكأس أحسن
+        if (!blob) { shareTextFallback(); return; }
+        const file = new File([blob], 'sultan-atari-cup.png', { type: 'image/png' });
         if (navigator.canShare({ files: [file] })) {
-          navigator.share({ title: 'الديوان', text, files: [file] }).catch(() => {});
+          navigator.share({ title: 'سلطان الأتاري', text, files: [file] }).catch(shareTextFallback);
         } else {
-          navigator.share({ title: 'الديوان', text }).catch(() => {});
+          navigator.share({ title: 'سلطان الأتاري', text }).catch(() => {});
         }
       }, 'image/png');
     });
   } else {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('تم النسخ!');
-    }).catch(() => {
-      alert(text);
-    });
+    shareTextFallback();
   }
 }
 
@@ -2408,7 +2974,7 @@ function getMaxCertAnimTime() {
 }
 
 /**
- * راسم الشهادة على Canvas مباشرة — بديل html2canvas بالكامل.
+ * راسم الكأس على Canvas مباشرة — بديل html2canvas بالكامل.
  * ليه؟ html2canvas كان بيبوظ الحروف العربية (بيفك التشابك) وبيقوي
  * زخرفة الشبكة التقاطعية (opacity override في النسخة المستنسخة).
  * fillText هنا بيستخدم محرك نصوص المتصفح نفسه فالعربية تطلع متصلة
@@ -2425,13 +2991,13 @@ function drawCertificateCanvas() {
     ctx.textAlign = 'center';
     try { ctx.direction = 'rtl'; } catch (e) {}
 
-    const INK = '#26344A', AMBER = '#C69A44', GOLD = '#C6A876',
-          SUCCESS = '#2E6E45', ERROR = '#A6362A', BURNT = '#8B4A38';
-    const PAPER_SOFT = (getComputedStyle(document.body).getPropertyValue('--diwan-paper-soft') || '').trim() || '#F3EBD8';
+    const INK = '#EAF4FF', AMBER = '#FFE600', PURPLE = '#B45CFF',
+          SUCCESS = '#22FF88', ERROR = '#FF3B5C', BURNT = '#FF9E3D';
+    const PAPER_SOFT = '#11112B';
     const DISPLAY = '"Baloo Bhaijaan 2","Aref Ruqaa",serif';
     const BODY = '"Cairo",sans-serif';
 
-    // ===== قراءة بيانات الشهادة الجاهزة من الـ DOM (بعد اكتمال الأنيميشن) =====
+    // ===== قراءة بيانات الكأس الجاهزة من الـ DOM (بعد اكتمال الأنيميشن) =====
     const textOf = function (id) { const el = document.getElementById(id); return el ? el.textContent : ''; };
     const stampEl = document.getElementById('certStamp');
     const stampClass = stampEl ? stampEl.className : '';
@@ -2463,29 +3029,25 @@ function drawCertificateCanvas() {
     };
 
     Promise.all([
-      loadImg('img/paper-ghibli.png'),
       photoEl ? loadImg(photoEl.src) : Promise.resolve(null),
       (sigEl && sigEl.style.display !== 'none' && sigEl.src) ? loadImg(sigEl.src) : Promise.resolve(null)
     ]).then(function (inputs) {
       try {
-        const paper = inputs[0], photo = inputs[1], sig = inputs[2];
+        const photo = inputs[0], sig = inputs[1];
 
-        // ===== الخلفية: ورق جيبلي مرسوم (نفس عالم المشهد) =====
+        // ===== الخلفية الداكنة + شبكة بكسل خفيفة (Task 28 أركيد) =====
         ctx.fillStyle = PAPER_SOFT;
         ctx.fillRect(0, 0, W, H);
-        if (paper) {
-          const pr = paper.width / paper.height, cr = W / H;
-          let dw, dh;
-          if (pr > cr) { dh = H + 40; dw = dh * pr; } else { dw = W + 40; dh = dw / pr; }
-          ctx.drawImage(paper, (W - dw) / 2, (H - dh) / 2, dw, dh);
-        }
+        ctx.fillStyle = 'rgba(255,255,255,.045)';
+        for (let gx = 0; gx < W; gx += 23) { ctx.fillRect(gx, 0, 3, H); }
+        for (let gy = 0; gy < H; gy += 23) { ctx.fillRect(0, gy, W, 3); }
 
-        // ===== البرواز المزدوج (كحلي + دهبي) ومعينات الأركان =====
-        ctx.strokeStyle = INK; ctx.lineWidth = 3;
-        rr(ctx, 14.5, 14.5, W - 29, H - 29, 16); ctx.stroke();
-        ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
-        rr(ctx, 26.5, 26.5, W - 53, H - 53, 11); ctx.stroke();
-        ctx.fillStyle = GOLD;
+        // ===== البرواز المزدوج (سيان نيون + بنفسجي) بأركان حادة =====
+        ctx.strokeStyle = '#00E5FF'; ctx.lineWidth = 4;
+        rr(ctx, 14.5, 14.5, W - 29, H - 29, 0); ctx.stroke();
+        ctx.strokeStyle = PURPLE; ctx.lineWidth = 2;
+        rr(ctx, 26.5, 26.5, W - 53, H - 53, 0); ctx.stroke();
+        ctx.fillStyle = '#00E5FF';
         [[26.5, 26.5], [W - 26.5, 26.5], [26.5, H - 26.5], [W - 26.5, H - 26.5]]
           .forEach(function (c) { diamond(ctx, c[0], c[1], 6); });
 
@@ -2495,7 +3057,7 @@ function drawCertificateCanvas() {
         // ===== الصورة الشخصية =====
         ctx.save();
         rr(ctx, RCX - 88, 78, 176, 200, 14);
-        ctx.fillStyle = 'rgba(255,255,255,.45)';
+        ctx.fillStyle = 'rgba(23,23,53,.9)';
         ctx.fill();
         ctx.lineWidth = 3; ctx.strokeStyle = INK; ctx.stroke();
         if (photo) {
@@ -2507,7 +3069,7 @@ function drawCertificateCanvas() {
           ctx.drawImage(photo, RCX - pw / 2, 81 + (194 - ph) / 2, pw, ph);
           ctx.restore();
         } else {
-          ctx.fillStyle = 'rgba(38,52,74,.35)';
+          ctx.fillStyle = 'rgba(154,163,208,.35)';
           ctx.font = '700 64px ' + BODY;
           ctx.fillText('\u25CF', RCX, 196);
         }
@@ -2520,11 +3082,11 @@ function drawCertificateCanvas() {
           let sw = maxW, sh = maxW / sr;
           if (sh > maxH) { sh = maxH; sw = maxH * sr; }
           ctx.drawImage(sig, RCX - sw / 2, 292 + (maxH - sh) / 2, sw, sh);
-          ctx.strokeStyle = 'rgba(38,52,74,.5)'; ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(154,163,208,.5)'; ctx.lineWidth = 1.5;
           line(ctx, RCX - 85, 380, RCX + 85, 380);
         }
 
-        // ===== الدمغة الرسمية =====
+        // ===== ختم السلطان =====
         if (damghaNum) {
           ctx.strokeStyle = AMBER; ctx.lineWidth = 2.5;
           ctx.beginPath(); ctx.arc(RCX, 466, 50, 0, Math.PI * 2); ctx.stroke();
@@ -2533,21 +3095,21 @@ function drawCertificateCanvas() {
           ctx.fillStyle = AMBER;
           ctx.font = '800 32px ' + DISPLAY;
           ctx.fillText(damghaNum, RCX, 477);
-          ctx.fillStyle = 'rgba(38,52,74,.6)';
+          ctx.fillStyle = 'rgba(154,163,208,.6)';
           ctx.font = '600 13px ' + BODY;
-          ctx.fillText('دمغة الديوان', RCX, 540);
+          ctx.fillText('ختم السلطان', RCX, 540);
         }
 
         // ===== عمود النصوص =====
         // 1) السطر التمهيدي
-        ctx.fillStyle = 'rgba(38,52,74,.75)';
+        ctx.fillStyle = 'rgba(154,163,208,.75)';
         ctx.font = '600 27px ' + BODY;
-        ctx.fillText('شهادة تقدير — الديوان', CX, 100);
+        ctx.fillText('كأس الأتاري ★', CX, 100);
 
         // 2) العنوان الكبير
         ctx.fillStyle = INK;
         ctx.font = '800 50px ' + DISPLAY;
-        ctx.fillText('نتائج التحدي النهائي', CX, 160);
+        ctx.fillText('نتائج الجولة النهائية', CX, 160);
 
         // فاصل دهبي بمعين
         ctx.strokeStyle = AMBER; ctx.lineWidth = 2.5;
@@ -2556,7 +3118,7 @@ function drawCertificateCanvas() {
         diamond(ctx, CX, 186, 5);
 
         // 3) الاسم بتوقيع مائل وخط موجي
-        const playerName = state.playerName || 'موظف الديوان';
+        const playerName = state.playerName || 'لاعب مجهول';
         ctx.save();
         ctx.translate(CX, 240);
         ctx.rotate(-1.5 * Math.PI / 180);
@@ -2579,7 +3141,7 @@ function drawCertificateCanvas() {
         ctx.fillStyle = AMBER;
         ctx.font = '800 72px ' + DISPLAY;
         ctx.fillText(scoreNum, CX, 332);
-        ctx.fillStyle = 'rgba(38,52,74,.7)';
+        ctx.fillStyle = 'rgba(154,163,208,.7)';
         ctx.font = '600 24px ' + BODY;
         ctx.fillText('نقطة', CX, 366);
         const pct = textOf('certPercent');
@@ -2592,7 +3154,7 @@ function drawCertificateCanvas() {
         // 5) عبارة التقييم (بتتقسم أسطر لو طويلة)
         const phrase = textOf('certPhrase');
         if (phrase) {
-          ctx.fillStyle = 'rgba(38,52,74,.85)';
+          ctx.fillStyle = 'rgba(154,163,208,.85)';
           ctx.font = '500 23px ' + BODY;
           const lines = wrapText(ctx, phrase, 830).slice(0, 2);
           lines.forEach(function (ln, i) { ctx.fillText(ln, CX, 442 + i * 34); });
@@ -2650,8 +3212,8 @@ function drawCertificateCanvas() {
             let x = CX - rowW / 2;
             row.forEach(function (p) {
               rr(ctx, x, y - pillH + 8, p[1], pillH, pillH / 2);
-              ctx.fillStyle = 'rgba(255,255,255,.42)'; ctx.fill();
-              ctx.strokeStyle = 'rgba(38,52,74,.25)'; ctx.lineWidth = 1; ctx.stroke();
+              ctx.fillStyle = 'rgba(29,29,69,.92)'; ctx.fill();
+              ctx.strokeStyle = 'rgba(154,163,208,.25)'; ctx.lineWidth = 1; ctx.stroke();
               ctx.fillStyle = INK;
               ctx.fillText(p[0], x + p[1] / 2, y + 11);
               x += p[1] + gap;
@@ -2662,15 +3224,15 @@ function drawCertificateCanvas() {
 
         // 8) سطر المرفقات
         if (encSec && encSec.style.display !== 'none' && encCount > 0) {
-          ctx.fillStyle = 'rgba(38,52,74,.7)';
+          ctx.fillStyle = 'rgba(154,163,208,.7)';
           ctx.font = '600 21px ' + BODY;
-          ctx.fillText('المرفقات: ' + encCount + (encCount === 1 ? ' بطاقة تقدير' : ' بطاقات تقدير'), CX, y + 24);
+          ctx.fillText('الأوسمة: ' + encCount + (encCount === 1 ? ' وسام' : ' أوسمة'), CX, y + 24);
           y += 36;
         }
 
         // 9) الرقم المرجعي
         if (refText) {
-          ctx.fillStyle = 'rgba(38,52,74,.55)';
+          ctx.fillStyle = 'rgba(154,163,208,.55)';
           ctx.font = '500 19px ' + BODY;
           ctx.fillText(refText, CX, H - 52);
         }
@@ -2745,7 +3307,7 @@ function captureCertificate(callback) {
     });
 }
 
-// زرار الرجوع للمكتب بعد استلام الشهادة
+// زرار الرجوع للصالة بعد استلام الكأس
 function returnToDeskFromCert() {
   Sound.paperRustle();
   switchScreen('screenCert', 'screenDesk');
@@ -2756,7 +3318,7 @@ function downloadCert() {
   Sound.penTap();
   captureCertificate(canvas => {
     const link = document.createElement('a');
-    link.download = 'diwan-certificate.png';
+    link.download = 'sultan-atari-cup.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
   });
@@ -2794,8 +3356,9 @@ state.orderItems = []; // current order of items (indices into correctOrder)
 function renderOrderQuestion(q) {
   const grid = document.getElementById('orderGrid');
   grid.innerHTML = '';
-  // خلط ترتيب العناصر بنسخة جديدة من correctOrder
-  state.orderItems = shuffleArray(q.correctOrder);
+  // خلط بنسخة جديدة — ولو الخلط طلع بالترتيب الصح بالصدفة بنقلبه تاني
+  // (سؤال بيفتح وهو محلول جاهز = مفيش — Task 31)
+  state.orderItems = shuffledOrderPure(q.correctOrder);
   renderOrderCards();
 }
 
@@ -2843,6 +3406,7 @@ function moveOrderCard(index, direction) {
 }
 
 function submitOrderAnswer() {
+  closeLampConfirm(); // لوحة اللمبة متتسابش مفتوحة في سؤال الترتيب بعد الإرسال
   clearInterval(timerInterval);
   const q = currentDocQuestions[currentDocQuestionIdx];
 
@@ -2897,6 +3461,7 @@ function submitTextAnswer() {
     setTimeout(() => input.classList.remove('shake'), 400);
     return;
   }
+  closeLampConfirm(); // لوحة اللمبة متتسابش مفتوحة بعد إرسال الإجابة
   clearInterval(timerInterval);
   const q = currentDocQuestions[currentDocQuestionIdx];
 
@@ -2914,7 +3479,7 @@ function submitTextAnswer() {
 }
 
 function checkTextAnswer(userAnswer, acceptableAnswers) {
-  if (!userAnswer) return false;
+  if (!userAnswer || !Array.isArray(acceptableAnswers)) return false;
   const normalized = userAnswer.trim().toLowerCase();
   for (const ans of acceptableAnswers) {
     const normAns = ans.trim().toLowerCase();
@@ -2944,47 +3509,50 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// ==================== لوحة الشرف (محلية على الجهاز) ====================
-const HALL_KEY = 'diwanHallOfFame';
-const HALL_MAX = 10;
+// ==================== الريكورد المحلي (ماكينة واحدة = ريكورد واحد — Task 33) ====================
+// القاعة اتلغت: أصحابك بيتبادلوا الكأس في الجروبات — دي المنافسة الحقيقية.
+// زي ماكينات الأتاري الحقيقية: الجهاز الواحد بيفتخر بريكورد واحد بس.
+const RECORD_KEY = 'atariRecordScore';
 
-function loadHall() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(HALL_KEY));
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
+// نقية للاختبارات: الريكورد بيفضل للأعلى — تعادل أو أقل = القديم يفضل
+function recordPure(oldRec, entry) {
+  const o = (oldRec && typeof oldRec.score === 'number' && isFinite(oldRec.score)) ? oldRec : null;
+  const n = (entry && typeof entry.score === 'number' && isFinite(entry.score)) ? entry : null;
+  if (!n) return { best: o, isNew: false };
+  if (!o || n.score > o.score) return { best: n, isNew: true };
+  return { best: o, isNew: false };
 }
 
-function saveHallStorage(list) {
-  try { localStorage.setItem(HALL_KEY, JSON.stringify(list)); } catch (e) {}
+function loadRecord() {
+  try { return JSON.parse(storeGet(RECORD_KEY) || 'null'); } catch (e) { return null; }
 }
 
-// نقية للاختبارات: دمج نتيجة — نفس الاسم يحتفظ بأحسن نتيجة — وترجع اللوحة المرتبة والمركز
-// المقارنة بأسماء موحّدة (مسافات متعادلة) عشان "أحمد " و "أحمد" ميبقوش شخصين
-function upsertHallPure(list, entry, max) {
-  const en = normalizeNamePure(entry.name);
-  const old = list.find(e => normalizeNamePure(e.name) === en);
-  const best = old && old.score >= entry.score ? old : entry;
-  const next = list.filter(e => normalizeNamePure(e.name) !== en);
-  next.push(best);
-  next.sort((a, b) => (b.score - a.score) || ((b.pct || 0) - (a.pct || 0)));
-  const trimmed = next.slice(0, max);
-  const rank = trimmed.findIndex(e => normalizeNamePure(e.name) === en) + 1;
-  return { list: trimmed, rank: rank, isBest: best === entry };
-}
-
-function recordInHall(score, pct, tierText) {
+function updateRecord(score, name, avatar) {
   const entry = {
-    name: normalizeNamePure(state.playerName) || 'موظف مجهول',
-    avatar: state.playerAvatar || '◆',
     score: score,
-    pct: pct,
-    tier: tierText || '',
+    name: normalizeNamePure(name) || 'لاعب مجهول',
+    avatar: avatar || '◆',
     date: arabicToday()
   };
-  const res = upsertHallPure(loadHall(), entry, HALL_MAX);
-  saveHallStorage(res.list);
+  const res = recordPure(loadRecord(), entry);
+  storeSet(RECORD_KEY, JSON.stringify(res.best));
   return res;
+}
+
+// ==================== شاشة الجذب — سطر الريكورد على الغلاف (Task 29 → 33) ====================
+// ستايل ATTRACT MODE: الماكينة الواقفة بتعرض ريكوردها عشان تجذب — سطر واحد بس
+function renderAttractMode() {
+  const box = document.getElementById('attractRows');
+  if (!box) return;
+  const rec = loadRecord();
+  if (rec && rec.score > 0) {
+    box.innerHTML = '<div class="attract-record">'
+      + '<span class="at-record-score">' + Number(rec.score) + '</span>'
+      + '<span class="at-record-name">' + escapeHtml(rec.name) + '</span>'
+      + '</div>';
+  } else {
+    box.innerHTML = '<div class="attract-empty">مفيش ريكورد على الجهاز ده… كون انت الأول!</div>';
+  }
 }
 
 function arabicToday() {
@@ -2992,10 +3560,10 @@ function arabicToday() {
   return now.getDate() + ' ' + MONTHS_AR[now.getMonth()] + ' ' + now.getFullYear();
 }
 
-// الشهور العربية — مستخدمة في تاريخ كارت الإنجاز ولوحة الشرف
+// الشهور العربية — مستخدمة في تاريخ كارت الإنجاز والريكورد
 const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
 
-// خلط فيشر-يتس — نسخة جديدة من غير تغيير الأصل (فطة + ترتيب)
+// خلط فيشر-يتس — نسخة جديدة من غير تغيير الأصل (طلقة القناص + ترتيب)
 function shuffleArray(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -3005,101 +3573,93 @@ function shuffleArray(arr) {
   return a;
 }
 
+// خلط ترتيب مش مطابق للأصل — سؤال الترتيب عمره ما بيفتح وهو محلول بالصدفة
+// (نقية للاختبارات: تبديل صحيح للعناصر + مضمون مش مطابق للترتيب الصح — Task 31)
+function shuffledOrderPure(order) {
+  const src = Array.isArray(order) ? order : [];
+  if (src.length < 2) return [...src];
+  let items = shuffleArray(src);
+  let tries = 0;
+  const same = () => items.every((v, i) => v === src[i]);
+  while (same() && tries < 8) { items = shuffleArray(src); tries++; }
+  if (same()) items = [...src.slice(1), src[0]]; // تدوير واحد يكسر التطابق مضمون (عناصر فريدة)
+  return items;
+}
+
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
 
-function toggleHall() {
-  const panel = document.getElementById('hallPanel');
-  const show = !panel.style.display || panel.style.display === 'none';
-  if (show) {
-    renderHall();
-    panel.style.display = '';
-  } else {
-    panel.style.display = 'none';
-  }
-  Sound.penTap();
-}
-
-function renderHall() {
-  const rows = document.getElementById('hallRows');
-  const list = loadHall();
-  if (!list.length) {
-    rows.innerHTML = '<div class="hall-empty">اللوحة لسه فاضية… كن أول موظف يعلّق اسمه فيها!</div>';
-    return;
-  }
-  const medals = ['🥇', '🥈', '🥉'];
-  const meNorm = normalizeNamePure(state.playerName);
-  rows.innerHTML = list.map((e, i) => {
-    const me = normalizeNamePure(e.name) === meNorm ? ' hall-me' : '';
-    const rank = medals[i] || ((i + 1) + '-');
-    return '<div class="hall-row' + (i < 3 ? ' hall-top' : '') + me + '">'
-      + '<span class="hall-rank">' + rank + '</span>'
-      + '<span class="hall-avatar">' + escapeHtml(e.avatar || '◆') + '</span>'
-      + '<span class="hall-name">' + escapeHtml(e.name) + '</span>'
-      + '<span class="hall-score">' + e.score + ' نقطة</span>'
-      + '</div>';
-  }).join('');
-}
-
 // ==================== PROMPT 6: BRIBE POWER-UP ====================
 
-function updateBribeButton() {
-  const btn = document.getElementById('btnBribe');
-  if (!state.hasBribe || state.mainScore < BRIBE_COST) {
+function updateLampButton() {
+  const btn = document.getElementById('btnLamp');
+  if (!btn) return;
+  if (!state.hasBribe || state.mainScore < LAMP_COST) {
     btn.disabled = true;
   } else {
     btn.disabled = false;
   }
 }
 
-function useBribe() {
+function useLamp() {
   if (!state.hasBribe) return;
+  if (docFeedbackLock) return; // ساحة الإجابة مقفولة — مفيش لمبة تتدفع على سؤال خلصانة (Task 36)
   if (witnessActive) return;
+  // حراسة النقاط — الزرار معطّل تحت 15 في الواجهة، وده قفل إضافي لو حصل سباق
+  if (state.mainScore < LAMP_COST) return;
   Sound.penTap();
   // Show confirmation overlay
-  document.getElementById('bribeConfirm').classList.add('visible');
+  document.getElementById('lampConfirm').classList.add('visible');
 }
 
-function confirmBribe() {
+function confirmLamp() {
   if (!state.hasBribe) return;
   // Guard: check score is still sufficient (may have changed while dialog was open)
-  if (state.mainScore < BRIBE_COST) {
-    cancelBribe();
+  if (state.mainScore < LAMP_COST) {
+    cancelLamp();
     return;
   }
   state.hasBribe = false;
-  document.getElementById('btnBribe').disabled = true;
-  document.getElementById('bribeConfirm').classList.remove('visible');
+  document.getElementById('btnLamp').disabled = true;
+  document.getElementById('lampConfirm').classList.remove('visible');
 
-  // خصم ثمن الشاي
-  state.mainScore -= BRIBE_COST;
+  // خصم ثمن اللمبة
+  state.mainScore -= LAMP_COST;
 
-  // Show hint from current question — الممتحن همسلك التلميح على الشاي
+  // Show hint from current question — صاحب الصالة شعّل اللمبة وورّيك الطريق
   const q = currentDocQuestions[currentDocQuestionIdx];
   if (q.hint) {
     const hintNote = document.getElementById('hintNote');
-    hintNote.textContent = '◆ الممتحن همسلك: ' + q.hint;
+    hintNote.textContent = '◆ صاحب الصالة همسلك: ' + q.hint;
     hintNote.style.display = '';
   } else {
     const hintNote = document.getElementById('hintNote');
-    hintNote.textContent = '◆ الممتحن: معلش يا باشا، السؤال ده مالوش تلميح… الشاي على حسابي ☕';
+    hintNote.textContent = '◆ صاحب الصالة: معلش يا باشا، السؤال ده مالوش تلميح… اللمبة دي على حسابي 💡';
     hintNote.style.display = '';
   }
-  Sound.teaSip();
-  updateBribeButton();
+  Sound.lampDing();
+  updateLampButton();
   saveState();
 }
 
-function cancelBribe() {
-  document.getElementById('bribeConfirm').classList.remove('visible');
+function cancelLamp() {
+  closeLampConfirm();
   Sound.penTap();
+}
+
+// قفل لوحة تأكيد اللمبة — بتتقفل مع أي نهاية سؤال (إجابة/مهلة) عشان متفضلش
+// مفتوحة على سؤال خلصانة والتأكيد بعدها بيحرق اللمبة والنقط على الفاضي
+function closeLampConfirm() {
+  const el = document.getElementById('lampConfirm');
+  if (el) el.classList.remove('visible');
 }
 
 // ==================== PROMPT 7: APPEAL SYSTEM ====================
 
 function useAppeal() {
   if (state.appealUsed) return;
+  if (docFeedbackLock) return; // ساحة الإجابة مقفولة — الوقت الزايد على سؤال ميت بيتبهدل (Task 36)
   if (witnessActive) return;
   state.appealUsed = true;
   Sound.penTap();
@@ -3128,14 +3688,15 @@ function showMarginNote(q) {
   // 40% chance
   if (Math.random() > 0.4) return;
   
-  // Pick a note that hasn't been used
-  const available = MARGIN_NOTES.filter((_, i) => !usedMarginNotes.has(i));
-  if (available.length === 0) return;
-  
-  const randIdx = Math.floor(Math.random() * available.length);
-  const noteText = available[randIdx];
-  const originalIdx = MARGIN_NOTES.indexOf(noteText);
+  // Pick a note that hasn't been used — بالفهرس مباشرة (أدق وأسرع من indexOf)
+  const availIdx = [];
+  for (let i = 0; i < MARGIN_NOTES.length; i++) {
+    if (!usedMarginNotes.has(i)) availIdx.push(i);
+  }
+  if (availIdx.length === 0) return;
+  const originalIdx = availIdx[Math.floor(Math.random() * availIdx.length)];
   usedMarginNotes.add(originalIdx);
+  const noteText = MARGIN_NOTES[originalIdx];
   
   const marginNote = document.getElementById('marginNote');
   marginNote.textContent = noteText;
@@ -3160,7 +3721,7 @@ function showMarginNote(q) {
 
 // ==================== حراسة الموسم (جولة جديدة = تصفير أوتوماتيكي) ====================
 // أي تعديل في ملف الأسئلة بيغيّر بصمة المحتوى — ولما البصمة تختلف اللعبة بتصفّر
-// لوحة الشرف والحفظ لوحدها وتبلش جولة جديدة. يعني تجديد الأسئلة كل فترة
+// الريكورد والحفظ لوحدها وتبلش جولة جديدة. يعني تجديد الأسئلة كل فترة
 // محتاج بس تعديل data/questions.js — من غير أي أزرار ولا إعدادات.
 const SEASON_KEY = 'diwanSeasonHash';
 let seasonJustReset = false;
@@ -3174,13 +3735,14 @@ function computeSeasonHash() {
 
 (function seasonGuard() {
   const cur = computeSeasonHash();
-  const prev = localStorage.getItem(SEASON_KEY);
+  const prev = storeGet(SEASON_KEY);
   if (prev === cur) return;
-  if (prev === null) { localStorage.setItem(SEASON_KEY, cur); return; } // أول تشغيل — من غير تصفير ولا إشعار
-  localStorage.setItem(SEASON_KEY, cur);
-  localStorage.removeItem(HALL_KEY);    // لوحة الشرف — صافية للجولة الجديدة
-  localStorage.removeItem(STORAGE_KEY); // الحفظ القديم — الملفات ترجع فاضية
-  localStorage.removeItem(REG_KEY);     // سجل الموظفين بيتصفّر برضه — كل جولة = دخلة جديدة للكل
+  if (prev === null) { storeSet(SEASON_KEY, cur); return; } // أول تشغيل — من غير تصفير ولا إشعار
+  storeSet(SEASON_KEY, cur);
+  storeDel(RECORD_KEY);  // الريكورد المحلي — جولة جديدة = منافسة نضيفة على أسئلة جديدة
+  storeDel(STORAGE_KEY); // الحفظ القديم — المراحل ترجع فاضية
+  storeDel(REG_KEY);     // سجل اللاعبين بيتصفّر برضه — كل جولة = دخلة جديدة للكل
+  wipeMemoryBackups();   // Task 34: المارايا الاحتياطية بتنسى الجولة القديمة — وإلا هتقفل جولة جديدة غلط
   clearDocTimeSnapshot();               // أي وقت متجمّع من الجولة القديمة مالوش لازمة
   seasonJustReset = true;
 })();
@@ -3191,7 +3753,7 @@ function showSeasonNote() {
   seasonJustReset = false;
   const el = document.createElement('div');
   el.className = 'season-note';
-  el.innerHTML = '<strong>🔔 جولة جديدة بدأت!</strong><span>الأسئلة اتغيّرت — لوحة الشرف اتصفّرت والملفات رجعت فاضية. بالتوفيق يا باشا ✨</span>';
+  el.innerHTML = '<strong>🔔 جولة جديدة بدأت!</strong><span>الأسئلة اتغيّرت — الريكورد اتصفّر والمراحل رجعت فاضية. بالتوفيق يا بطل ✨</span>';
   document.body.appendChild(el);
   setTimeout(() => el.classList.add('show'), 80);
   setTimeout(() => {
@@ -3203,11 +3765,13 @@ function showSeasonNote() {
 // ==================== RESTORE SAVED STATE ON LOAD ====================
 (function restoreOnLoad() {
   const reg = getRegisteredName();
-  const hasSaved = localStorage.getItem(STORAGE_KEY);
+  const hasSaved = storeGet(STORAGE_KEY);
 
-  // موظف متسجل؟ الدخلة اتستهلكت — بيرجع للمكتب على طول من غير سؤال الاستكمال
+  // لاعب متسجل؟ الدخلة اتستهلكت — بيرجع للصالة على طول من غير سؤال الاستكمال
   if (reg) {
     showEntryLocked();
+    // Task 34: سد الثغرات — مارايا ناقصة (لاعب قديم أول ترقية) بتتكمل لوحدها
+    writeMemoryMirror(buildMemPayload(computeSeasonHash(), reg));
     if (hasSaved) {
       loadState();
       applyMuteIcon();
@@ -3223,24 +3787,34 @@ function showSeasonNote() {
     return;
   }
 
-  if (!hasSaved) return;
-  if (!confirm('هل تريد استمرار اللعب من حيث توقفت؟')) {
-    clearSavedState();
-    return;
-  }
-  loadState();
-  // Restore muted icon
-  applyMuteIcon();
-  // Jump to desk screen directly
-  if (state.playerName) {
-    state.activeSetId = null;
-    state.appealUsed = false;
-    // نفس القاعدة للموظف اللي لسه مسجلش: السؤال الشغال بيرجع يفتح لوحده
-    if (resumeDocFromSnapshot()) return;
-    switchScreen('screenEntry', 'screenDesk');
-    setTimeout(() => showDeskHub(), 200);
-  }
+  // Task 34: مفيش تسجيل محلي؟ المارايا الاحتياطية بتفاوت — لو فاكرة نفس الموسم
+  // القفل بيرجع يتركب لوحده، ولو لأ يبقى اللاعب ده جديد بجد
+  restoreRegistrationFromBackup().then(function (restored) {
+    if (restored) return;
+    if (!hasSaved) return;
+    if (!confirm('هل تريد استمرار اللعب من حيث توقفت؟')) {
+      clearSavedState();
+      return;
+    }
+    loadState();
+    // Restore muted icon
+    applyMuteIcon();
+    // Jump to desk screen directly
+    if (state.playerName) {
+      state.activeSetId = null;
+      state.appealUsed = false;
+      // نفس القاعدة لللاعب اللي لسه مسجلش: السؤال الشغال بيرجع يفتح لوحده
+      if (resumeDocFromSnapshot()) return;
+      switchScreen('screenEntry', 'screenDesk');
+      setTimeout(() => showDeskHub(), 200);
+    }
+  });
 })();
+
+renderAttractMode();
 
 // إشعار الجولة الجديدة (لو حصل تصفير موسم)
 setTimeout(showSeasonNote, 900);
+
+// Task 34: فحص الوضع بلا ذاكرة — تحذير خفيف بس لو المتصفح مش بيتذكر
+setTimeout(memProbe, 400);
